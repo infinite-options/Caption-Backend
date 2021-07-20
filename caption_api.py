@@ -235,13 +235,13 @@ def serializeResponse(response):
 # OPTIONAL: Set skipSerialization to True to skip default JSON response serialization
 def execute(sql, cmd, conn, skipSerialization=False):
     response = {}
-    # print("in Execute")
-    # print(cmd)
+    print("in Execute")
+    print(cmd)
     try:
         with conn.cursor() as cur:
-            # print("before query")
+            print("before query")
             cur.execute(sql)
-            # print("after query")
+            print("after query")
             if cmd is "get":
                 result = cur.fetchall()
                 response["message"] = "Successfully executed SQL query."
@@ -251,9 +251,9 @@ def execute(sql, cmd, conn, skipSerialization=False):
                     result = serializeResponse(result)
                 response["result"] = result
             elif cmd in "post":
-                # print("in POST")
+                print("in POST")
                 conn.commit()
-                # print("after commit")
+                print("after commit")
                 response["message"] = "Successfully committed SQL command."
                 # Return status code of 281 for successful POST request
                 response["code"] = 281
@@ -348,10 +348,10 @@ class createGame(Resource):
 
             num_rounds = data["rounds"]
             time_limit = data["round_time"]
-            # print(data) 
+            print(data) 
 
             new_game_uid = get_new_gameUID(conn)
-            # print(new_game_uid)
+            print(new_game_uid)
             print(getNow())
 
             game_code = random.randint(10000000,99999999)
@@ -360,10 +360,11 @@ class createGame(Resource):
             query =  '''
                 INSERT INTO captions.game
                 SET game_uid = \'''' + new_game_uid + '''\',
-                    game_timestamp = \'''' + getNow() + '''\',
+                    game_created_at = \'''' + getNow() + '''\',
                     game_code = \'''' + str(game_code) + '''\',
                     num_rounds = \'''' + num_rounds + '''\',
-                    time_limit = \'''' + time_limit + '''\'
+                    time_limit = \'''' + time_limit + '''\',
+                    game_host_uid = \'''' + str(game_code) + '''\'
                 '''
             
             items = execute(query, "post", conn)
