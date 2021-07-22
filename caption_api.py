@@ -258,9 +258,7 @@ def execute(sql, cmd, conn, skipSerialization=False):
                 # Return status code of 281 for successful POST request
                 response["code"] = 281
             else:
-                response[
-                    "message"
-                ] = "Request failed. Unknown or ambiguous instruction given for MySQL command."
+                response["message"] = "Request failed. Unknown or ambiguous instruction given for MySQL command."
                 # Return status code of 480 for unknown HTTP method
                 response["code"] = 480
     except:
@@ -310,11 +308,6 @@ def get_new_userUID(conn):
         return newPurchaseQuery['result'][0]['new_id']
     return "Could not generate new user UID", 500
 
-
-
-
-
-
 def get_new_paymentID(conn):
     newPaymentQuery = execute("CALL new_payment_uid", 'get', conn)
     if newPaymentQuery['code'] == 280:
@@ -333,7 +326,8 @@ def get_new_appointmentUID(conn):
         return newAppointmentQuery['result'][0]['new_id']
     return "Could not generate new appointment UID", 500
 
-# -- Queries start here -------------------------------------------------------------------------------
+
+# --Caption Queries start here -------------------------------------------------------------------------------
 
 
 class createGame(Resource):
@@ -354,7 +348,7 @@ class createGame(Resource):
             print(new_game_uid)
             print(getNow())
 
-            game_code = random.randint(10000000,99999999)
+            game_code = random.randint(10000000, 99999999)
             print(game_code)
             
             query =  '''
@@ -364,7 +358,7 @@ class createGame(Resource):
                     game_code = \'''' + str(game_code) + '''\',
                     num_rounds = \'''' + num_rounds + '''\',
                     time_limit = \'''' + time_limit + '''\',
-                    game_host_uid = \'''' + str(game_code) + '''\'
+                    game_host_uid = NULL
                 '''
             
             items = execute(query, "post", conn)
@@ -416,12 +410,12 @@ class createUser(Resource):
             user_alias  = data["user_alias"]
             user_email  = data["user_email"]
             user_zip    = data["user_zip"]
-            # print(data) 
+            # print(data)
 
             new_user_uid = get_new_userUID(conn)
             print(new_user_uid)
             print(getNow())
-            
+
             query =  '''
                 INSERT INTO captions.user
                 SET user_uid = \'''' + new_user_uid + '''\',
@@ -432,7 +426,7 @@ class createUser(Resource):
                     user_zip_code = \'''' + user_zip + '''\',
                     user_purchases = NULL
                 '''
-            
+
             items = execute(query, "post", conn)
             print("items: ", items)
             if items["code"] == 281:
@@ -440,6 +434,83 @@ class createUser(Resource):
                 return response, 200
         except:
             raise BadRequest("Create User Request failed")
+        finally:
+            disconnect(conn)
+
+
+class createNewGame(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+
+            # User/Host data
+            user_name   = data["user_name"]
+            user_alias  = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
+            user_email  = data["user_email"]
+            user_zip    = data["user_zip"]
+            # print(data)
+
+            # Game data
+            new_game_uid = get_new_gameUID(conn)
+            # print(new_game_uid)
+            num_rounds = "6"    # Default number of rounds
+            time_limit = "0000-00-00 00:00:10"  # Default time-limit
+            game_code = random.randint(10000000, 99999999)
+            print(game_code)
+
+            # check if the user is already present
+            check_query = '''SELECT user_uid FROM captions.user 
+                                WHERE user_email= \'''' + user_email + '''\' 
+                                AND user_zip_code =\'''' + user_zip + '''\'
+                                '''
+            user = execute(check_query, "get", conn)
+            print(user)
+            new_user_uid = ""
+            if len(user["result"]) > 0:
+                # if user is already present
+                new_user_uid = user["result"][0]["user_uid"]
+                print(new_user_uid)
+            else:
+                new_user_uid = get_new_userUID(conn)
+                # print(new_user_uid)
+                # print(getNow())
+                query ='''
+                    INSERT INTO captions.user
+                    SET user_uid = \'''' + new_user_uid + '''\',
+                        user_created_at = \'''' + getNow() + '''\',
+                        user_name = \'''' + user_name + '''\', 
+                        user_alias = \'''' + user_alias + '''\', 
+                        user_email = \'''' + user_email + '''\', 
+                        user_zip_code = \'''' + user_zip + '''\',
+                        user_purchases = NULL
+                    '''
+
+                items = execute(query, "post", conn)
+                print("items: ", items)
+            if user["code"] == 280 or items["code"] == 281:
+                create_game_query = '''
+                INSERT INTO captions.game
+                SET game_uid = \'''' + new_game_uid + '''\',
+                    game_created_at = \'''' + getNow() + '''\',
+                    game_code = \'''' + str(game_code) + '''\',
+                    num_rounds = \'''' + num_rounds + '''\',
+                    time_limit = \'''' + time_limit + '''\',
+                    game_host_uid = \'''' + new_user_uid + '''\'
+                    '''
+                game_items = execute(create_game_query, "post", conn)
+                print("game_items: ", game_items)
+                if game_items["code"] == 281:
+                    response["message"] = "Create New Game successful"
+                    response["game_code"] = str(game_code)
+                    return response, 200
+
+        except:
+            raise BadRequest("Create New Game Request failed")
         finally:
             disconnect(conn)
 
@@ -1130,6 +1201,7 @@ class stripe_key(Resource):
 api.add_resource(createGame, "/api/v2/createGame")
 api.add_resource(checkGame, "/api/v2/checkGame/<string:gameId>")
 api.add_resource(createUser, "/api/v2/createUser")
+api.add_resource(createNewGame, "/api/v2/createNewGame")
 
 
 
