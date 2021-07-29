@@ -534,6 +534,7 @@ class createNewGame(Resource):
                     if add_user["code"] == 281:
                         response["round_message"] = "Host added to the game."
                         response["game_code"] = str(game_code)
+                        response["host_id"] = new_user_uid
                         return response, 200
 
         except:
@@ -593,7 +594,7 @@ class joinGame(Resource):
                     # print(new_user_uid)
                     # print(getNow())
                     add_new_user_query ='''
-                                        INSERT INTO captions.user
+                                            INSERT INTO captions.user
                                         SET user_uid = \'''' + user_uid + '''\',
                                             user_created_at = \'''' + getNow() + '''\',
                                             user_name = \'''' + user_name + '''\', 
@@ -667,13 +668,13 @@ class decks(Resource):
         try:
             conn = connect()
             get_all_decks_query = '''
-                                SELECT deck FROM captions.deck
+                                SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description FROM captions.deck
                                 '''
             decks = execute(get_all_decks_query, "get", conn)
             print("players info: ", decks)
             if decks["code"] == 280:
                 response["message"] = "280, get available decks request successful."
-                response["decks_info"] = str(decks["result"])
+                response["decks_info"] = decks["result"]
 
                 return response, 200
         except:
@@ -682,7 +683,51 @@ class decks(Resource):
             disconnect(conn)
 
     def post(self):
-        pass
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+        except:
+            raise BadRequest("Create User Request failed")
+        finally:
+            disconnect(conn)
+
+
+class gameTimer(Resource):
+    def get(self, game_code):
+        print("requested game_uid: ", game_code)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            round_start_time = 0
+            round_duration = 0
+            current_time = getNow()
+            get_game_timer_info = '''
+                                SELECT captions.round.round_started_at, captions.game.time_limit
+                                FROM captions.round
+                                JOIN captions.game
+                                ON captions.round.round_game_uid = captions.game.game_uid
+                                WHERE captions.game.game_code = \'''' + game_code + '''\'
+                                '''
+            timer = execute(get_game_timer_info, "get", conn)
+
+            print("timer info: ", timer)
+            if timer["code"] == 280:
+                response["message"] = "280, Timer information request successful."
+                response["current_time"] = current_time
+                round_start_time = timer["result"][0]["round_started_at"]
+                round_duration = timer["result"][0]["time_limit"]
+                response["round_started_at"] = round_start_time
+                response["round_duration"] = round_duration
+                return response, 200
+        except:
+            raise BadRequest("Get players in the game request failed")
+        finally:
+            disconnect(conn)
 
 
 
@@ -1360,19 +1405,17 @@ class stripe_key(Resource):
             return {'publicKey': stripe_public_live_key} 
 
 # -- DEFINE APIS -------------------------------------------------------------------------------
-
-
 # Define API routes
-
-
 api.add_resource(createGame, "/api/v2/createGame")
 api.add_resource(checkGame, "/api/v2/checkGame/<string:game_code>")
 api.add_resource(createUser, "/api/v2/createUser")
 api.add_resource(createNewGame, "/api/v2/createNewGame")
 api.add_resource(joinGame, "/api/v2/joinGame")
 api.add_resource(getPlayers, "/api/v2/getPlayers/<string:gameUID>")
+api.add_resource(decks, "/api/v2/decks")
+api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>")
 
-
+# reference APIs
 api.add_resource(CreateAppointment, "/api/v2/createAppointment")
 api.add_resource(AvailableAppointments, "/api/v2/availableAppointments/<string:date_value>")
 api.add_resource(AddContact, "/api/v2/addContact")
