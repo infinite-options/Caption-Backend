@@ -15,7 +15,7 @@ import math
 
 from datetime import time, date, datetime, timedelta
 import calendar
-
+import time
 from pytz import timezone
 import random
 import string
@@ -469,7 +469,7 @@ class createNewGame(Resource):
             new_game_uid = get_new_gameUID(conn)
             # print(new_game_uid)
             num_rounds = "6"    # Default number of rounds
-            time_limit = "0000-00-00 00:00:10"  # Default time-limit
+            time_limit = "00:00:10"  # Default time-limit
             game_code = random.randint(10000000, 99999999)
             print(game_code)
 
@@ -696,6 +696,36 @@ class decks(Resource):
             disconnect(conn)
 
 
+class selectDeck(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+            deck_uid = data["deck_uid"]
+            game_uid = data["game_uid"]
+            round_number = data["round_number"]
+
+            select_deck_query = '''
+                                UPDATE captions.round 
+                                SET round_deck_uid=\'''' + deck_uid + '''\'
+                                WHERE round_game_uid=\'''' + game_uid + '''\' 
+                                AND round_number=\'''' + round_number + '''\'
+                                '''
+            selected_deck = execute(select_deck_query, "post", conn)
+            print("selected deck info: ", selected_deck)
+            if selected_deck["code"] == 281:
+                response["message"] = "281, Deck successfully submitted."
+                return response, 200
+        except:
+            raise BadRequest("Create User Request failed")
+        finally:
+            disconnect(conn)
+
+
 class gameTimer(Resource):
     def get(self, game_code):
         print("requested game_uid: ", game_code)
@@ -730,6 +760,35 @@ class gameTimer(Resource):
             disconnect(conn)
 
 
+class changeRoundsAndDuration(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+            game_code = data["game_code"]
+            num_rounds = data["number_of_rounds"]
+            seconds = data["round_duration"]
+            round_duration = time.strftime('%H:%M:%S', time.gmtime(int(seconds)))
+
+            change_rounds_and_duration_query = '''
+                                UPDATE captions.game 
+                                SET num_rounds=\'''' + num_rounds + '''\',
+                                time_limit=\'''' + round_duration + '''\' 
+                                WHERE game_code=\'''' + game_code + '''\'
+                                '''
+            update_game_attr = execute(change_rounds_and_duration_query, "post", conn)
+            print("game_attr_update info: ", update_game_attr)
+            if update_game_attr["code"] == 281:
+                response["message"] = "281, Rounds and duration successfully updated."
+                return response, 200
+        except:
+            raise BadRequest("Update rounds and time Request failed")
+        finally:
+            disconnect(conn)
 
 
 
@@ -1414,6 +1473,9 @@ api.add_resource(joinGame, "/api/v2/joinGame")
 api.add_resource(getPlayers, "/api/v2/getPlayers/<string:gameUID>")
 api.add_resource(decks, "/api/v2/decks")
 api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>")
+api.add_resource(selectDeck, "/api/v2/selectDeck")
+api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
+# api.add_resource(getImageURL, "/api/v2/getImageURL/")
 
 # reference APIs
 api.add_resource(CreateAppointment, "/api/v2/createAppointment")
