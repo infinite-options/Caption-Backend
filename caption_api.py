@@ -528,7 +528,8 @@ class createNewGame(Resource):
                                             round_image_uid = NULL ,
                                             caption = NULL,
                                             votes = NULL,
-                                            score = NULL'''
+                                            score = NULL, 
+                                            round_started_at = NULL'''
                     add_user = execute(add_user_to_round_query, "post", conn)
                     print("add_user_response: ", add_user)
                     if add_user["code"] == 281:
@@ -619,7 +620,8 @@ class joinGame(Resource):
                                             round_image_uid = NULL ,
                                             caption = NULL,
                                             votes = NULL,
-                                            score = NULL'''
+                                            score = NULL,
+                                            round_started_at = NULL'''
                     add_user = execute(add_user_to_round_query, "post", conn)
                     print("add_user_response: ", add_user)
                     if add_user["code"] == 281:
@@ -644,7 +646,7 @@ class getPlayers(Resource):
         try:
             conn = connect()
             get_players_query = '''
-                                SELECT user_alias FROM captions.user 
+                                SELECT user_uid, user_alias FROM captions.user 
                                 INNER JOIN captions.round 
                                 ON user.user_uid = round.round_user_uid
                                 WHERE round_game_uid = \'''' + gameUID + '''\'
@@ -653,9 +655,9 @@ class getPlayers(Resource):
             print("players info: ", players)
             if players["code"] == 280:
                 response["message"] = "280, Get players request successful."
-                response["players_list"] = ""
+                response["players_list"] = {}
                 for player in players["result"]:
-                    response["players_list"] += (player["user_alias"] + ",")
+                    response["players_list"][player["user_uid"]] = player["user_alias"]
                 return response, 200
         except:
             raise BadRequest("Get players in the game request failed")
@@ -691,7 +693,7 @@ class decks(Resource):
             # print to Received data to Terminal
             print("Received:", data)
         except:
-            raise BadRequest("Create User Request failed")
+            raise BadRequest("Create deck Request failed")
         finally:
             disconnect(conn)
 
@@ -721,7 +723,7 @@ class selectDeck(Resource):
                 response["message"] = "281, Deck successfully submitted."
                 return response, 200
         except:
-            raise BadRequest("Create User Request failed")
+            raise BadRequest("Select deck Request failed")
         finally:
             disconnect(conn)
 
@@ -733,8 +735,8 @@ class gameTimer(Resource):
         items = {}
         try:
             conn = connect()
-            round_start_time = 0
-            round_duration = 0
+            # round_start_time = 0
+            # round_duration = 0
             current_time = getNow()
             get_game_timer_info = '''
                                 SELECT captions.round.round_started_at, captions.game.time_limit
@@ -755,7 +757,7 @@ class gameTimer(Resource):
                 response["round_duration"] = round_duration
                 return response, 200
         except:
-            raise BadRequest("Get players in the game request failed")
+            raise BadRequest("Get game timer request failed")
         finally:
             disconnect(conn)
 
@@ -791,8 +793,72 @@ class changeRoundsAndDuration(Resource):
             disconnect(conn)
 
 
+class getImageInRound(Resource):
+    def get(self, game_code):
+        print("requested game_uid: ", game_code)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            get_image_query = '''
+                            SELECT image_uid, image_url FROM captions.image
+                            ORDER BY RAND()
+                            LIMIT 1                                  
+                            '''
+            image_info = execute(get_image_query, "get", conn)
+
+            print("image info: ", image_info)
+            if image_info["code"] == 280:
+                response["message1"] = "280, get image request successful."
+                image_uid = image_info["result"][0]["image_uid"]
+                write_to_round_query = '''
+                                    UPDATE captions.round
+                                    SET round_image_uid=\'''' + image_uid + '''\'
+                                    WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                    WHERE game_code=\'''' + game_code + '''\')
+                                    '''
+                updated_round = execute(write_to_round_query, "post", conn)
+                print("game_attr_update info: ", updated_round)
+                if updated_round["code"] == 281:
+                    response["message2"] = "281, Round updated."
+                    return response, 200
+        except:
+            raise BadRequest("Get image in round request failed")
+        finally:
+            disconnect(conn)
 
 
+class submitCaption(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+            caption = data["caption"]
+            round_number = data["round_number"]
+            game_code = data["game_code"]
+            user_uid = data["user_uid"]
+
+            submit_caption_query = '''
+                                UPDATE captions.round 
+                                SET caption=\'''' + caption + '''\' 
+                                WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                WHERE game_code=\'''' + game_code + '''\') 
+                                AND round_number=\'''' + round_number + '''\'
+                                AND round_user_uid=\'''' + user_uid + '''\' 
+                                '''
+            caption = execute(submit_caption_query, "post", conn)
+            print("caption info: ", caption)
+            if caption["code"] == 281:
+                response["message"] = "281, Caption for the user updated."
+                return response, 200
+        except:
+            raise BadRequest("submit caption Request failed")
+        finally:
+            disconnect(conn)
 
 
 
@@ -1475,7 +1541,8 @@ api.add_resource(decks, "/api/v2/decks")
 api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>")
 api.add_resource(selectDeck, "/api/v2/selectDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
-# api.add_resource(getImageURL, "/api/v2/getImageURL/")
+api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>")
+api.add_resource(submitCaption, "/api/v2/submitCaption")
 
 # reference APIs
 api.add_resource(CreateAppointment, "/api/v2/createAppointment")
