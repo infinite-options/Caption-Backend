@@ -810,6 +810,7 @@ class getImageInRound(Resource):
             print("image info: ", image_info)
             if image_info["code"] == 280:
                 response["message1"] = "280, get image request successful."
+                response["image_url"] = image_info["result"][0]["image_url"]
                 image_uid = image_info["result"][0]["image_uid"]
                 write_to_round_query = '''
                                     UPDATE captions.round
