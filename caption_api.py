@@ -978,36 +978,34 @@ class voteCaption(Resource):
         finally:
             disconnect(conn)
 
-# rethink on this
-# class getPlayersWhoHaventVoted(Resource):
-#     def get(self, game_code, round_number):
-#         print("requested game_code: ", game_code)
-#         print("requested round_number:", round_number)
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-#             get_players_query = '''
-#                             SELECT captions.round.round_user_uid, captions.user.user_alias
-#                             FROM captions.round
-#                             INNER JOIN captions.user
-#                             ON captions.round.round_user_uid=captions.user.user_uid
-#                             WHERE round_game_uid = (SELECT game_uid FROM captions.game
-#                             WHERE game_code=\'''' + game_code + '''\')
-#                             AND round_number=\'''' + round_number + '''\'
-#                             AND votes=0
-#                             '''
-#             players_info = execute(get_players_query, "get", conn)
-#
-#             print("players info: ", players_info)
-#             if players_info["code"] == 280:
-#                 response["message1"] = "280, get players who haven't submitted votes request successful."
-#                 response["players"] = players_info["result"]
-#                 return response, 200
-#         except:
-#             raise BadRequest("Get players who haven't submitted votes request failed")
-#         finally:
-#             disconnect(conn)
+
+class getPlayersWhoHaventVoted(Resource):
+    def get(self, game_code, round_number):
+        print("requested game_code: ", game_code)
+        print("requested round_number:", round_number)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            get_players_count_query = '''
+                            SELECT COUNT(votes)-SUM(votes) FROM captions.round
+                            INNER JOIN captions.user
+                            ON captions.round.round_user_uid=captions.user.user_uid
+                            WHERE round_game_uid = (SELECT game_uid FROM captions.game
+                            WHERE game_code=\'''' + game_code + '''\')
+                            AND round_number=\'''' + round_number + '''\'
+                            '''
+            players_count = execute(get_players_count_query, "get", conn)
+
+            print("players info: ", players_count)
+            if players_count["code"] == 280:
+                response["message1"] = "280, get players who haven't submitted votes request successful."
+                response["players_count"] = players_count["result"][0]["COUNT(votes)-SUM(votes)"]
+                return response, 200
+        except:
+            raise BadRequest("Get players who haven't submitted votes request failed")
+        finally:
+            disconnect(conn)
 
 class getScoreBoard(Resource):
     def get(self, game_code, round_number):
@@ -1776,7 +1774,7 @@ api.add_resource(submitCaption, "/api/v2/submitCaption")
 api.add_resource(getPlayersRemainingToSubmitCaption, "/api/v2/getPlayersRemainingToSubmitCaption/<string:game_code>,<string:round_number>")
 api.add_resource(getAllSubmittedCaptions, "/api/v2/getAllSubmittedCaptions/<string:game_code>,<string:round_number>")
 api.add_resource(voteCaption, "/api/v2/voteCaption")
-# api.add_resource(getPlayersWhoHav entVoted, "/api/v2/getPlayersWhoHaventVoted/<string:game_code>,<string:round_number>")
+api.add_resource(getPlayersWhoHaventVoted, "/api/v2/getPlayersWhoHaventVoted/<string:game_code>,<string:round_number>")
 api.add_resource(createNextRound, "/api/v2/createNextRound")
 api.add_resource(getScoreBoard, "/api/v2/getScoreBoard/<string:game_code>,<string:round_number>")
 api.add_resource(startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>")
