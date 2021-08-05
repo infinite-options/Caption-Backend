@@ -792,6 +792,33 @@ class changeRoundsAndDuration(Resource):
             disconnect(conn)
 
 
+class startPlaying(Resource):
+    def get(self, game_code, round_number):
+        print("game_code: ", game_code)
+        print("round_number: ", round_number)
+        response = {}
+        try:
+            conn = connect()
+            current_time = getNow()
+
+            start_round_query = '''
+                                UPDATE captions.round
+                                SET round_started_at=\'''' + current_time + '''\'
+                                WHERE round_game_uid = (SELECT game_uid FROM captions.game 
+                                WHERE game_code=\'''' + game_code + '''\')
+                                AND round_number=\'''' + round_number + '''\'
+                                '''
+            round_timestamp = execute(start_round_query, "post", conn)
+            print("round_timestamp_result: ", round_timestamp)
+            if round_timestamp["code"] == 281:
+                response["message"] = "281, game started."
+                response["round_start_time"] = current_time
+                return response, 200
+        except:
+            raise BadRequest("Get image in round request failed")
+        finally:
+            disconnect(conn)
+
 class getImageInRound(Resource):
     def get(self, game_code):
         print("requested game_uid: ", game_code)
@@ -1752,6 +1779,8 @@ api.add_resource(voteCaption, "/api/v2/voteCaption")
 # api.add_resource(getPlayersWhoHav entVoted, "/api/v2/getPlayersWhoHaventVoted/<string:game_code>,<string:round_number>")
 api.add_resource(createNextRound, "/api/v2/createNextRound")
 api.add_resource(getScoreBoard, "/api/v2/getScoreBoard/<string:game_code>,<string:round_number>")
+api.add_resource(startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>")
+
 
 # reference APIs
 api.add_resource(CreateAppointment, "/api/v2/createAppointment")
