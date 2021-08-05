@@ -862,6 +862,63 @@ class submitCaption(Resource):
             disconnect(conn)
 
 
+class getPlayersWhoSubmittedCaption(Resource):
+    def get(self, game_code, round_number):
+        print("requested game_code: ", game_code)
+        print("requested round_number:", round_number)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            get_players_query = '''
+                            SELECT captions.round.round_user_uid, captions.user.user_alias
+                            FROM captions.round
+                            INNER JOIN captions.user 
+                            ON captions.round.round_user_uid=captions.user.user_uid
+                            WHERE round_game_uid = (SELECT game_uid FROM captions.game 
+                            WHERE game_code=\'''' + game_code + '''\')
+                            AND round_number=\'''' + round_number + '''\'
+                            AND caption IS NOT NULL                         
+                            '''
+            players_info = execute(get_players_query, "get", conn)
+
+            print("players info: ", players_info)
+            if players_info["code"] == 280:
+                response["message1"] = "280, get players who submitted captions request successful."
+                response["players"] = players_info["result"]
+                return response, 200
+        except:
+            raise BadRequest("Get players who have submitted captions request failed")
+        finally:
+            disconnect(conn)
+
+
+class getAllSubmittedCaptions(Resource):
+    def get(self, game_code, round_number):
+        print("requested game_code: ", game_code)
+        print("requested round_number:", round_number)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            get_captions_query = '''
+                            SELECT round_user_uid, caption FROM captions.round
+                            WHERE round_game_uid = (SELECT game_uid FROM captions.game 
+                            WHERE game_code=\'''' + game_code + '''\')
+                            AND round_number=\'''' + round_number + '''\'
+                            AND caption IS NOT NULL                         
+                            '''
+            captions = execute(get_captions_query, "get", conn)
+
+            print("players info: ", captions)
+            if captions["code"] == 280:
+                response["message1"] = "280, get players who submitted captions request successful."
+                response["players"] = captions["result"]
+                return response, 200
+        except:
+            raise BadRequest("Get all captions in round request failed")
+        finally:
+            disconnect(conn)
 
 
 
@@ -1544,6 +1601,9 @@ api.add_resource(selectDeck, "/api/v2/selectDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
 api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>")
 api.add_resource(submitCaption, "/api/v2/submitCaption")
+api.add_resource(getPlayersWhoSubmittedCaption, "/api/v2/getPlayersWhoSubmittedCaption/<string:game_code>,<string:round_number>")
+api.add_resource(getAllSubmittedCaptions, "/api/v2/getAllSubmittedCaptions/<string:game_code>,<string:round_number>")
+
 
 # reference APIs
 api.add_resource(CreateAppointment, "/api/v2/createAppointment")
