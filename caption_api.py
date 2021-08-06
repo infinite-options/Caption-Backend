@@ -707,13 +707,14 @@ class selectDeck(Resource):
             # print to Received data to Terminal
             print("Received:", data)
             deck_uid = data["deck_uid"]
-            game_uid = data["game_uid"]
+            game_code = data["game_code"]
             round_number = data["round_number"]
 
             select_deck_query = '''
                                 UPDATE captions.round 
                                 SET round_deck_uid=\'''' + deck_uid + '''\'
-                                WHERE round_game_uid=\'''' + game_uid + '''\' 
+                                WHERE round_game_uid=(SELECT game_uid FROM captions.game
+                                WHERE game_code=\'''' + game_code + '''\') 
                                 AND round_number=\'''' + round_number + '''\'
                                 '''
             selected_deck = execute(select_deck_query, "post", conn)
