@@ -824,8 +824,9 @@ class startPlaying(Resource):
             disconnect(conn)
 
 class getImageInRound(Resource):
-    def get(self, game_code):
-        print("requested game_uid: ", game_code)
+    def get(self, game_code, round_number):
+        print("requested game_code: ", game_code)
+        print("requested round_number: ", round_number)
         response = {}
         items = {}
         try:
@@ -847,6 +848,7 @@ class getImageInRound(Resource):
                                     SET round_image_uid=\'''' + image_uid + '''\'
                                     WHERE round_game_uid=(SELECT game_uid FROM captions.game 
                                     WHERE game_code=\'''' + game_code + '''\')
+                                    AND round_number = \'''' + round_number + '''\'
                                     '''
                 updated_round = execute(write_to_round_query, "post", conn)
                 print("game_attr_update info: ", updated_round)
@@ -1805,7 +1807,7 @@ api.add_resource(decks, "/api/v2/decks")
 api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>")
 api.add_resource(selectDeck, "/api/v2/selectDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
-api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>")
+api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>,<string:round_number>")
 api.add_resource(submitCaption, "/api/v2/submitCaption")
 api.add_resource(getPlayersRemainingToSubmitCaption, "/api/v2/getPlayersRemainingToSubmitCaption/<string:game_code>,<string:round_number>")
 api.add_resource(getAllSubmittedCaptions, "/api/v2/getAllSubmittedCaptions/<string:game_code>,<string:round_number>")
