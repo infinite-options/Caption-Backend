@@ -527,8 +527,8 @@ class createNewGame(Resource):
                                             round_deck_uid = NULL,
                                             round_image_uid = NULL ,
                                             caption = NULL,
-                                            votes = NULL,
-                                            score = NULL, 
+                                            votes = 0,
+                                            score = 0, 
                                             round_started_at = NULL'''
                     add_user = execute(add_user_to_round_query, "post", conn)
                     print("add_user_response: ", add_user)
@@ -620,8 +620,8 @@ class joinGame(Resource):
                                             round_deck_uid = NULL,
                                             round_image_uid = NULL ,
                                             caption = NULL,
-                                            votes = NULL,
-                                            score = NULL,
+                                            votes = 0,
+                                            score = 0,
                                             round_started_at = NULL'''
                     add_user = execute(add_user_to_round_query, "post", conn)
                     print("add_user_response: ", add_user)
