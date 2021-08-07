@@ -536,6 +536,7 @@ class createNewGame(Resource):
                         response["round_message"] = "Host added to the game."
                         response["game_code"] = str(game_code)
                         response["host_id"] = new_user_uid
+                        response["host_alias"] = user_alias
                         return response, 200
 
         except:
@@ -596,7 +597,7 @@ class joinGame(Resource):
                     # print(getNow())
                     add_new_user_query ='''
                                             INSERT INTO captions.user
-                                        SET user_uid = \'''' + user_uid + '''\',
+                                            SET user_uid = \'''' + user_uid + '''\',
                                             user_created_at = \'''' + getNow() + '''\',
                                             user_name = \'''' + user_name + '''\', 
                                             user_alias = \'''' + user_alias + '''\', 
@@ -627,6 +628,8 @@ class joinGame(Resource):
                     if add_user["code"] == 281:
                         response["message"] = "Player added to the game."
                         response["game_uid"] = game_uid
+                        response["user_uid"] = user_uid
+                        response["user_alias"] = user_alias
                         return response, 200
             else:
                 response["warning"] = "Invalid game code."
