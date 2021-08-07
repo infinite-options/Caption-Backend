@@ -859,6 +859,38 @@ class getImageInRound(Resource):
             disconnect(conn)
 
 
+class getImageForPlayers(Resource):
+    def get(self, game_code, round_number):
+        print("requested game_code: ", game_code)
+        print("requested round_number:", round_number)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            get_image_query = '''
+                            SELECT DISTINCT captions.image.image_url, captions.round.round_image_uid
+                            FROM captions.image
+                            INNER JOIN captions.round
+                            ON captions.image.image_uid = captions.round.round_image_uid
+                            WHERE round_game_uid = (SELECT game_uid FROM captions.game
+                            WHERE game_code=\'''' + game_code + '''\')
+                            AND round_number=\'''' + round_number + '''\'                  
+                            '''
+            image_info = execute(get_image_query, "get", conn)
+
+            print("image info: ", image_info)
+            if image_info["code"] == 280:
+                response["message"] = "280, get image for players other than host request successful."
+                response["image_uid"] = image_info["result"][0]["round_image_uid"]
+                response["image_url"] = image_info["result"][0]["image_url"]
+                return response, 200
+        except:
+            raise BadRequest("Get image for players other than host request failed")
+        finally:
+            disconnect(conn)
+
+
+
 class submitCaption(Resource):
     def post(self):
         response = {}
@@ -1782,7 +1814,7 @@ api.add_resource(getPlayersWhoHaventVoted, "/api/v2/getPlayersWhoHaventVoted/<st
 api.add_resource(createNextRound, "/api/v2/createNextRound")
 api.add_resource(getScoreBoard, "/api/v2/getScoreBoard/<string:game_code>,<string:round_number>")
 api.add_resource(startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>")
-
+api.add_resource(getImageForPlayers, "/api/v2/getImageForPlayers/<string:game_code>,<string:round_number>")
 
 # reference APIs
 api.add_resource(CreateAppointment, "/api/v2/createAppointment")
