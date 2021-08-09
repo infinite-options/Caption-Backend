@@ -1054,6 +1054,53 @@ class getScoreBoard(Resource):
         items = {}
         try:
             conn = connect()
+            get_game_score = '''
+                            SELECT round_user_uid, SUM(score) as game_score FROM captions.round
+                            WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                WHERE game_code=\'''' + game_code + '''\')
+                            GROUP BY round_user_uid
+                            '''
+            game_score = execute(get_game_score, "get", conn)
+            print("game_score_info:", game_score)
+            if game_score["code"] == 280:
+                get_score_query = '''
+                                SELECT captions.round.round_user_uid, captions.user.user_alias,
+                                captions.round.caption, captions.round.votes, captions.round.score
+                                FROM captions.round
+                                INNER JOIN captions.user
+                                ON captions.round.round_user_uid=captions.user.user_uid
+                                WHERE round_game_uid = (SELECT game_uid FROM captions.game
+                                WHERE game_code=\'''' + game_code + '''\')
+                                AND round_number=\'''' + round_number + '''\'
+                                AND caption IS NOT NULL
+                                '''
+                scoreboard = execute(get_score_query, "get", conn)
+                print("score info: ", scoreboard)
+                if scoreboard["code"] == 280:
+                    response["message"] = "280, scoreboard is updated and get_score_board request " \
+                                          "successful."
+                    index = 0
+                    for game_info, round_info in zip(game_score["result"], scoreboard["result"]):
+                        # print("game_score:", game_info)
+                        # print("round_info:", round_info)
+                        scoreboard["result"][index]["game_score"] = game_info["game_score"]
+                        index += 1
+                    response["scoreboard"] = scoreboard["result"]
+                    return response, 200
+        except:
+            raise BadRequest("Get scoreboard request failed")
+        finally:
+            disconnect(conn)
+
+
+class updateScores(Resource):
+    def get(self, game_code, round_number):
+        print("requested game_code: ", game_code)
+        print("requested round_number:", round_number)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
             highest_votes = 0
             second_highest_votes = 0
             get_highest_votes = '''
@@ -1093,42 +1140,11 @@ class getScoreBoard(Resource):
                                         '''
                     update_scores = execute(update_scores_query, "post", conn)
                     if update_scores["code"] == 281:
-                        get_game_score = '''
-                                        SELECT round_user_uid, SUM(score) as game_score FROM captions.round
-                                        WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                            WHERE game_code=\'''' + game_code + '''\')
-                                        GROUP BY round_user_uid
-                                        '''
-                        game_score = execute(get_game_score, "get", conn)
-                        print("game_score_info:", game_score)
-                        if game_score["code"] == 280:
-                            get_score_query = '''
-                                            SELECT captions.round.round_user_uid, captions.user.user_alias,
-                                            captions.round.caption, captions.round.votes, captions.round.score
-                                            FROM captions.round
-                                            INNER JOIN captions.user
-                                            ON captions.round.round_user_uid=captions.user.user_uid
-                                            WHERE round_game_uid = (SELECT game_uid FROM captions.game
-                                            WHERE game_code=\'''' + game_code + '''\')
-                                            AND round_number=\'''' + round_number + '''\'
-                                            AND caption IS NOT NULL
-                                            '''
-                            scoreboard = execute(get_score_query, "get", conn)
-                            print("score info: ", scoreboard)
-                            if scoreboard["code"] == 280:
-                                response["message"] = "280, scoreboard is updated and get_score_board request " \
-                                                      "successful."
-                                index = 0
-                                for game_info, round_info in zip(game_score["result"], scoreboard["result"]):
-                                    # print("game_score:", game_info)
-                                    # print("round_info:", round_info)
-                                    scoreboard["result"][index]["game_score"] = game_info["game_score"]
-                                    index += 1
-                                response["scoreboard"] = scoreboard["result"]
-                                return response, 200
+                        response["message"] = "281, update scoreboard request successful."
+                        return response, 200
 
         except:
-            raise BadRequest("Get scoreboard request failed")
+            raise BadRequest("update scoreboard request failed")
         finally:
             disconnect(conn)
 
@@ -1874,6 +1890,7 @@ api.add_resource(getAllSubmittedCaptions, "/api/v2/getAllSubmittedCaptions/<stri
 api.add_resource(voteCaption, "/api/v2/voteCaption")
 api.add_resource(getPlayersWhoHaventVoted, "/api/v2/getPlayersWhoHaventVoted/<string:game_code>,<string:round_number>")
 api.add_resource(createNextRound, "/api/v2/createNextRound")
+api.add_resource(updateScores, "/api/v2/updateScores/<string:game_code>,<string:round_number>")
 api.add_resource(getScoreBoard, "/api/v2/getScoreBoard/<string:game_code>,<string:round_number>")
 api.add_resource(startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>")
 api.add_resource(getImageForPlayers, "/api/v2/getImageForPlayers/<string:game_code>,<string:round_number>")
