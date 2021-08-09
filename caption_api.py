@@ -732,7 +732,7 @@ class selectDeck(Resource):
 
 
 class gameTimer(Resource):
-    def get(self, game_code):
+    def get(self, game_code, round_number):
         print("requested game_uid: ", game_code)
         response = {}
         items = {}
@@ -747,6 +747,7 @@ class gameTimer(Resource):
                                 JOIN captions.game
                                 ON captions.round.round_game_uid = captions.game.game_uid
                                 WHERE captions.game.game_code = \'''' + game_code + '''\'
+                                AND round_number=\'''' + round_number + '''\'
                                 '''
             timer = execute(get_game_timer_info, "get", conn)
 
@@ -1053,24 +1054,79 @@ class getScoreBoard(Resource):
         items = {}
         try:
             conn = connect()
-            get_score_query = '''
-                            SELECT captions.round.round_user_uid, captions.user.user_alias,
-                            captions.round.caption, captions.round.votes, captions.round.score 
-                            FROM captions.round
-                            INNER JOIN captions.user 
-                            ON captions.round.round_user_uid=captions.user.user_uid
-                            WHERE round_game_uid = (SELECT game_uid FROM captions.game 
-                            WHERE game_code=\'''' + game_code + '''\')
-                            AND round_number=\'''' + round_number + '''\'
-                            AND caption IS NOT NULL                         
-                            '''
-            scoreboard = execute(get_score_query, "get", conn)
+            highest_votes = 0
+            second_highest_votes = 0
+            get_highest_votes = '''
+                                SELECT MAX(votes) FROM captions.round
+                                WHERE round_game_uid = (SELECT game_uid FROM captions.game 
+                                    WHERE game_code=\'''' + game_code + '''\')
+                                AND round_number=\'''' + round_number + '''\'
+                                '''
+            winner = execute(get_highest_votes, "get", conn)
+            print("winner_info:", winner)
+            if winner["code"] == 280:
+                highest_votes = str(winner["result"][0]["MAX(votes)"])
+                print("highest votes: ", highest_votes, type(highest_votes))
+                get_second_highest_votes = '''
+                                            SELECT votes FROM captions.round 
+                                            WHERE votes= (SELECT DISTINCT(votes) 
+                                                FROM captions.round ORDER BY votes DESC LIMIT 1,1) 
+                                            AND round_game_uid=(SELECT game_uid FROM captions.game 
+                                                WHERE game_code=\'''' + game_code + '''\') 
+                                            AND round_number=\'''' + round_number + '''\'
+                                            '''
+                runner_up = execute(get_second_highest_votes, "get", conn)
+                print("runner-up info:", runner_up)
+                if runner_up["code"] == 280:
+                    second_highest_votes = str(runner_up["result"][0]["votes"])
+                    print("second highest votes: ", second_highest_votes, type(second_highest_votes))
+                    update_scores_query = '''
+                                        UPDATE captions.round	
+                                        SET score = CASE
+                                            WHEN votes=\'''' + highest_votes + '''\' THEN score+5 
+                                            WHEN votes=\'''' + second_highest_votes + '''\' THEN score+3
+                                            ELSE 0
+                                            END
+                                        WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                            WHERE game_code=\'''' + game_code + '''\')
+                                        AND round_number=\'''' + round_number + '''\'
+                                        '''
+                    update_scores = execute(update_scores_query, "post", conn)
+                    if update_scores["code"] == 281:
+                        get_game_score = '''
+                                        SELECT round_user_uid, SUM(score) as game_score FROM captions.round
+                                        WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                            WHERE game_code=\'''' + game_code + '''\')
+                                        GROUP BY round_user_uid
+                                        '''
+                        game_score = execute(get_game_score, "get", conn)
+                        print("game_score_info:", game_score)
+                        if game_score["code"] == 280:
+                            get_score_query = '''
+                                            SELECT captions.round.round_user_uid, captions.user.user_alias,
+                                            captions.round.caption, captions.round.votes, captions.round.score
+                                            FROM captions.round
+                                            INNER JOIN captions.user
+                                            ON captions.round.round_user_uid=captions.user.user_uid
+                                            WHERE round_game_uid = (SELECT game_uid FROM captions.game
+                                            WHERE game_code=\'''' + game_code + '''\')
+                                            AND round_number=\'''' + round_number + '''\'
+                                            AND caption IS NOT NULL
+                                            '''
+                            scoreboard = execute(get_score_query, "get", conn)
+                            print("score info: ", scoreboard)
+                            if scoreboard["code"] == 280:
+                                response["message"] = "280, scoreboard is updated and get_score_board request " \
+                                                      "successful."
+                                index = 0
+                                for game_info, round_info in zip(game_score["result"], scoreboard["result"]):
+                                    print("game_score:", game_info)
+                                    print("round_info:", round_info)
+                                    scoreboard["result"][index]["game_score"] = game_info["game_score"]
+                                    index += 1
+                                response["scoreboard"] = scoreboard["result"]
+                                return response, 200
 
-            print("score info: ", scoreboard)
-            if scoreboard["code"] == 280:
-                response["message1"] = "280, get scoreboard request successful."
-                response["players"] = scoreboard["result"]
-                return response, 200
         except:
             raise BadRequest("Get scoreboard request failed")
         finally:
@@ -1091,7 +1147,7 @@ class createNextRound(Resource):
             new_round_number = str(int(round_number) + 1)
 
             players_query = '''
-                                SELECT round_user_uid FROM captions.round
+                                SELECT round_user_uid, round_deck_uid FROM captions.round
                                 WHERE round_game_uid = (SELECT game_uid FROM captions.game 
                                 WHERE game_code=\'''' + game_code + '''\')
                                 AND round_number=\'''' + round_number + '''\'
@@ -1104,13 +1160,17 @@ class createNextRound(Resource):
                 for i in range(num_players):
                     new_round_uid = get_new_roundUID(conn)
                     user_uid = players["result"][i]["round_user_uid"]
+                    deck_uid = players["result"][i]["round_deck_uid"]
                     add_user_to_next_round_query = '''
                                                     INSERT INTO captions.round
                                                     SET round_uid =\'''' + new_round_uid + '''\',
                                                     round_user_uid=\'''' + user_uid + '''\',
                                                     round_game_uid=(SELECT game_uid FROM captions.game
                                                     WHERE game_code=\'''' + game_code + '''\'),
-                                                    round_number=\'''' + new_round_number + '''\'
+                                                    round_number=\'''' + new_round_number + '''\', 
+                                                    round_deck_uid=\'''' + deck_uid + '''\',
+                                                    votes=0,
+                                                    score=0
                                                     '''
                     next_round = execute(add_user_to_next_round_query, "post", conn)
                     print("caption info: ", next_round)
@@ -1804,7 +1864,7 @@ api.add_resource(createNewGame, "/api/v2/createNewGame")
 api.add_resource(joinGame, "/api/v2/joinGame")
 api.add_resource(getPlayers, "/api/v2/getPlayers/<string:game_code>")
 api.add_resource(decks, "/api/v2/decks")
-api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>")
+api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>,<string:round_number>")
 api.add_resource(selectDeck, "/api/v2/selectDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
 api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>,<string:round_number>")
