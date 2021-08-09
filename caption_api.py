@@ -1069,16 +1069,16 @@ class getScoreBoard(Resource):
                 print("highest votes: ", highest_votes, type(highest_votes))
                 get_second_highest_votes = '''
                                             SELECT votes FROM captions.round 
-                                            WHERE votes= (SELECT DISTINCT(votes) 
-                                                FROM captions.round ORDER BY votes DESC LIMIT 1,1) 
-                                            AND round_game_uid=(SELECT game_uid FROM captions.game 
+                                            WHERE round_game_uid=(SELECT game_uid FROM captions.game 
                                                 WHERE game_code=\'''' + game_code + '''\') 
                                             AND round_number=\'''' + round_number + '''\'
+                                            AND votes<\'''' + highest_votes + '''\'
                                             '''
                 runner_up = execute(get_second_highest_votes, "get", conn)
                 print("runner-up info:", runner_up)
                 if runner_up["code"] == 280:
-                    second_highest_votes = str(runner_up["result"][0]["votes"])
+                    second_highest_votes = str(runner_up["result"][0]["votes"]) if runner_up["result"] and \
+                                                                                   runner_up["result"][0]["votes"] > 0 else "-1"
                     print("second highest votes: ", second_highest_votes, type(second_highest_votes))
                     update_scores_query = '''
                                         UPDATE captions.round	
@@ -1120,8 +1120,8 @@ class getScoreBoard(Resource):
                                                       "successful."
                                 index = 0
                                 for game_info, round_info in zip(game_score["result"], scoreboard["result"]):
-                                    print("game_score:", game_info)
-                                    print("round_info:", round_info)
+                                    # print("game_score:", game_info)
+                                    # print("round_info:", round_info)
                                     scoreboard["result"][index]["game_score"] = game_info["game_score"]
                                     index += 1
                                 response["scoreboard"] = scoreboard["result"]
@@ -1173,7 +1173,7 @@ class createNextRound(Resource):
                                                     score=0
                                                     '''
                     next_round = execute(add_user_to_next_round_query, "post", conn)
-                    print("caption info: ", next_round)
+                    print("next_round info: ", next_round)
                     if next_round["code"] == 281:
                         continue
                     else:
@@ -1183,7 +1183,7 @@ class createNextRound(Resource):
                 response["message"] = "281, Next Round successfully created."
                 return response, 200
         except:
-            raise BadRequest("submit caption Request failed")
+            raise BadRequest("create next round Request failed")
         finally:
             disconnect(conn)
 
