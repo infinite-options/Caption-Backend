@@ -12,7 +12,6 @@ import boto3
 import json
 import math
 
-
 from datetime import time, date, datetime, timedelta
 import calendar
 import time
@@ -32,7 +31,6 @@ from flask_mail import Mail, Message
 
 from werkzeug.exceptions import BadRequest, NotFound
 from werkzeug.security import generate_password_hash, check_password_hash
-
 
 #  NEED TO SOLVE THIS
 # from NotificationHub import Notification
@@ -62,7 +60,6 @@ import pytz
 import pymysql
 import requests
 
-
 RDS_HOST = "io-mysqldb8.cxjnrciilyjq.us-west-1.rds.amazonaws.com"
 RDS_PORT = 3306
 RDS_USER = "admin"
@@ -71,12 +68,9 @@ RDS_DB = "captions"
 # app = Flask(__name__)
 app = Flask(__name__, template_folder="assets")
 
-
-
 # --------------- Stripe Variables ------------------
 # these key are using for testing. Customer should use their stripe account's keys instead
 import stripe
-
 
 # STRIPE AND PAYPAL KEYS
 paypal_secret_test_key = os.environ.get('paypal_secret_key_test')
@@ -93,8 +87,8 @@ stripe_secret_live_key = os.environ.get('stripe_secret_live_key')
 
 stripe.api_key = stripe_secret_test_key
 
-#use below for local testing
-#stripe.api_key = ""sk_test_51J0UzOLGBFAvIBPFAm7Y5XGQ5APR...WTenXV4Q9ANpztS7Y7ghtwb007quqRPZ3"" 
+# use below for local testing
+# stripe.api_key = ""sk_test_51J0UzOLGBFAvIBPFAm7Y5XGQ5APR...WTenXV4Q9ANpztS7Y7ghtwb007quqRPZ3""
 
 
 CORS(app)
@@ -116,7 +110,6 @@ app.config["MAIL_PORT"] = 465
 app.config["MAIL_USE_TLS"] = False
 app.config["MAIL_USE_SSL"] = True
 
-
 # Set this to false when deploying to live application
 # app.config['DEBUG'] = True
 app.config["DEBUG"] = False
@@ -131,13 +124,17 @@ api = Api(app)
 # convert to UTC time zone when testing in local time zone
 utc = pytz.utc
 
+
 # # These statment return Day and Time in GMT
 # def getToday(): return datetime.strftime(datetime.now(utc), "%Y-%m-%d")
 # def getNow(): return datetime.strftime(datetime.now(utc), "%Y-%m-%d %H:%M:%S")
 
 # # These statment return Day and Time in Local Time - Not sure about PST vs PDT
 def getToday(): return datetime.strftime(datetime.now(), "%Y-%m-%d")
-def getNow(): return datetime.strftime(datetime.now(),"%Y-%m-%d %H:%M:%S")
+
+
+def getNow(): return datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
+
 
 # Not sure what these statments do
 # getToday = lambda: datetime.strftime(date.today(), "%Y-%m-%d")
@@ -168,8 +165,6 @@ RDS_PW = "prashant"
 # allowed extensions for uploading a profile photo file
 ALLOWED_EXTENSIONS = set(["png", "jpg", "jpeg"])
 
-
-
 # For Push notification
 isDebug = False
 NOTIFICATION_HUB_KEY = os.environ.get("NOTIFICATION_HUB_KEY")
@@ -177,6 +172,7 @@ NOTIFICATION_HUB_NAME = os.environ.get("NOTIFICATION_HUB_NAME")
 
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
+
 
 # Connect to MySQL database (API v2)
 def connect():
@@ -302,11 +298,13 @@ def get_new_gameUID(conn):
         return newGameQuery['result'][0]['new_id']
     return "Could not generate new game UID", 500
 
+
 def get_new_roundUID(conn):
     newRoundQuery = execute("CALL captions.new_round_uid()", 'get', conn)
     if newRoundQuery['code'] == 280:
         return newRoundQuery['result'][0]['new_id']
     return "Could not generate new game UID", 500
+
 
 def get_new_userUID(conn):
     newPurchaseQuery = execute("CALL captions.new_user_uid()", 'get', conn)
@@ -314,17 +312,20 @@ def get_new_userUID(conn):
         return newPurchaseQuery['result'][0]['new_id']
     return "Could not generate new user UID", 500
 
+
 def get_new_paymentID(conn):
     newPaymentQuery = execute("CALL new_payment_uid", 'get', conn)
     if newPaymentQuery['code'] == 280:
         return newPaymentQuery['result'][0]['new_id']
     return "Could not generate new payment ID", 500
 
+
 def get_new_contactUID(conn):
     newPurchaseQuery = execute("CALL io.new_contact_uid()", 'get', conn)
     if newPurchaseQuery['code'] == 280:
         return newPurchaseQuery['result'][0]['new_id']
     return "Could not generate new contact UID", 500
+
 
 def get_new_appointmentUID(conn):
     newAppointmentQuery = execute("CALL io.new_appointment_uid()", 'get', conn)
@@ -348,7 +349,7 @@ class createGame(Resource):
 
             num_rounds = data["rounds"]
             time_limit = data["round_time"]
-            print(data) 
+            print(data)
 
             new_game_uid = get_new_gameUID(conn)
             print(new_game_uid)
@@ -356,8 +357,8 @@ class createGame(Resource):
 
             game_code = random.randint(10000000, 99999999)
             print(game_code)
-            
-            query =  '''
+
+            query = '''
                 INSERT INTO captions.game
                 SET game_uid = \'''' + new_game_uid + '''\',
                     game_created_at = \'''' + getNow() + '''\',
@@ -366,7 +367,7 @@ class createGame(Resource):
                     time_limit = \'''' + time_limit + '''\',
                     game_host_uid = NULL
                 '''
-            
+
             items = execute(query, "post", conn)
             print("items: ", items)
             if items["code"] == 281:
@@ -378,6 +379,7 @@ class createGame(Resource):
         finally:
             disconnect(conn)
 
+
 class checkGame(Resource):
     def get(self, game_code):
         print(game_code)
@@ -385,8 +387,8 @@ class checkGame(Resource):
         items = {}
         try:
             conn = connect()
-            
-            query =  '''
+
+            query = '''
                 SELECT game_uid FROM captions.game
                 WHERE game_code = \'''' + game_code + '''\';
                 '''
@@ -416,17 +418,17 @@ class createUser(Resource):
             # print to Received data to Terminal
             print("Received:", data)
 
-            user_name   = data["user_name"]
-            user_alias  = data["user_alias"]
-            user_email  = data["user_email"]
-            user_zip    = data["user_zip"]
+            user_name = data["user_name"]
+            user_alias = data["user_alias"]
+            user_email = data["user_email"]
+            user_zip = data["user_zip"]
             # print(data)
 
             new_user_uid = get_new_userUID(conn)
             print(new_user_uid)
             print(getNow())
 
-            query =  '''
+            query = '''
                 INSERT INTO captions.user
                 SET user_uid = \'''' + new_user_uid + '''\',
                     user_created_at = \'''' + getNow() + '''\',
@@ -459,16 +461,16 @@ class createNewGame(Resource):
             print("Received:", data)
 
             # User/Host data
-            user_name   = data["user_name"]
-            user_alias  = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
-            user_email  = data["user_email"]
-            user_zip    = data["user_zip"]
+            user_name = data["user_name"]
+            user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
+            user_email = data["user_email"]
+            user_zip = data["user_zip"]
             # print(data)
 
             # Game data
             new_game_uid = get_new_gameUID(conn)
             # print(new_game_uid)
-            num_rounds = "6"    # Default number of rounds
+            num_rounds = "6"  # Default number of rounds
             time_limit = "00:00:10"  # Default time-limit
             game_code = random.randint(10000000, 99999999)
             print(game_code)
@@ -489,7 +491,7 @@ class createNewGame(Resource):
                 new_user_uid = get_new_userUID(conn)
                 # print(new_user_uid)
                 # print(getNow())
-                query ='''
+                query = '''
                     INSERT INTO captions.user
                     SET user_uid = \'''' + new_user_uid + '''\',
                         user_created_at = \'''' + getNow() + '''\',
@@ -558,11 +560,11 @@ class joinGame(Resource):
             print("Received:", data)
 
             # player data
-            user_name   = data["user_name"]
-            user_alias  = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
-            user_email  = data["user_email"]
-            user_zip    = data["user_zip"]
-            game_code   = data["game_code"]
+            user_name = data["user_name"]
+            user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
+            user_email = data["user_email"]
+            user_zip = data["user_zip"]
+            game_code = data["game_code"]
 
             # get the game_uid from the game code
             check_game_code_query = '''
@@ -595,7 +597,7 @@ class joinGame(Resource):
                     user_uid = get_new_userUID(conn)
                     # print(new_user_uid)
                     # print(getNow())
-                    add_new_user_query ='''
+                    add_new_user_query = '''
                                             INSERT INTO captions.user
                                             SET user_uid = \'''' + user_uid + '''\',
                                             user_created_at = \'''' + getNow() + '''\',
@@ -665,6 +667,7 @@ class getPlayers(Resource):
             raise BadRequest("Get players in the game request failed")
         finally:
             disconnect(conn)
+
 
 class decks(Resource):
     def get(self):
@@ -824,6 +827,7 @@ class startPlaying(Resource):
         finally:
             disconnect(conn)
 
+
 class getImageInRound(Resource):
     def get(self, game_code, round_number):
         print("requested game_code: ", game_code)
@@ -891,7 +895,6 @@ class getImageForPlayers(Resource):
             raise BadRequest("Get image for players other than host request failed")
         finally:
             disconnect(conn)
-
 
 
 class submitCaption(Resource):
@@ -1046,6 +1049,7 @@ class getPlayersWhoHaventVoted(Resource):
         finally:
             disconnect(conn)
 
+
 class getScoreBoard(Resource):
     def get(self, game_code, round_number):
         print("requested game_code: ", game_code)
@@ -1125,7 +1129,8 @@ class updateScores(Resource):
                 print("runner-up info:", runner_up)
                 if runner_up["code"] == 280:
                     second_highest_votes = str(runner_up["result"][0]["votes"]) if runner_up["result"] and \
-                                                                                   runner_up["result"][0]["votes"] > 0 else "-1"
+                                                                                   runner_up["result"][0][
+                                                                                       "votes"] > 0 else "-1"
                     print("second highest votes: ", second_highest_votes, type(second_highest_votes))
                     update_scores_query = '''
                                         UPDATE captions.round	
@@ -1204,11 +1209,19 @@ class createNextRound(Resource):
             disconnect(conn)
 
 
-
-
-
-
-
+class endGame(Resource):
+    def get(self, game_code):
+        print("game code: ", game_code)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            response["message"] = "281, end game request successful."
+            return response, 200
+        except:
+            raise BadRequest("end game Request failed")
+        finally:
+            disconnect(conn)
 
 
 # -- Examples of Other Queries start here -------------------------------------------------------------------------------
@@ -1266,11 +1279,12 @@ class AvailableAppointments(Resource):
             # print("Available Times: ", str(available_times['result'][0]["start_time"]))
 
             return available_times
-        
+
         except:
             raise BadRequest('Available Time Request failed, please try again later.')
         finally:
             disconnect(conn)
+
 
 # BOOK APPOINTMENT
 class CreateAppointment(Resource):
@@ -1306,7 +1320,7 @@ class CreateAppointment(Resource):
             print("NewID = ", new_appointment_uid)
             print(getNow())
 
-            query =  '''
+            query = '''
                 INSERT INTO io.appointments
                 SET appointment_uid = \'''' + new_appointment_uid + '''\',
                     appt_created_at = \'''' + getNow() + '''\',
@@ -1333,6 +1347,7 @@ class CreateAppointment(Resource):
         # ENDPOINT AND JSON OBJECT THAT WORKS
         # http://localhost:4000/api/v2/createappointment
 
+
 # ADD CONTACT
 class AddContact(Resource):
     def post(self):
@@ -1355,8 +1370,7 @@ class AddContact(Resource):
             print(new_contact_uid)
             print(getNow())
 
-            
-            query =  '''
+            query = '''
                 INSERT INTO io.contact
                 SET contact_uid = \'''' + new_contact_uid + '''\',
                     contact_created_at = \'''' + getNow() + '''\',
@@ -1366,7 +1380,7 @@ class AddContact(Resource):
                     phone = \'''' + phone + '''\',
                     subject = \'''' + subject + '''\'
                 '''
-            
+
             items = execute(query, "post", conn)
             print("items: ", items)
             if items["code"] == 281:
@@ -1376,7 +1390,6 @@ class AddContact(Resource):
             raise BadRequest("Request failed, please try again later.")
         finally:
             disconnect(conn)
-
 
 
 # -- ACCOUNT APIS -------------------------------------------------------------------------------
@@ -1408,10 +1421,10 @@ class createAccount(Resource):
             cust_id = data["cust_id"] if data.get("cust_id") is not None else "NULL"
 
             if (
-                data.get("social") is None
-                or data.get("social") == "FALSE"
-                or data.get("social") == False
-                or data.get("social") == "NULL"
+                    data.get("social") is None
+                    or data.get("social") == "FALSE"
+                    or data.get("social") == False
+                    or data.get("social") == "NULL"
             ):
                 social_signup = False
             else:
@@ -1463,7 +1476,7 @@ class createAccount(Resource):
                 NewUserID = cust_id
 
                 query = (
-                    """
+                        """
                         SELECT user_access_token, user_refresh_token, mobile_access_token, mobile_refresh_token 
                         FROM io.customers
                         WHERE customer_uid = \'""" + cust_id + """\';
@@ -1488,25 +1501,25 @@ class createAccount(Resource):
                     """
                         UPDATE io.customers 
                         SET 
-                        customer_created_at = \'"""+ (datetime.now()).strftime("%Y-%m-%d %H:%M:%S")+ """\',
-                        customer_first_name = \'"""+ firstName+ """\',
-                        customer_last_name = \'"""+ lastName+ """\',
-                        customer_phone_num = \'"""+ phone+ """\',
-                        customer_address = \'"""+ address+ """\',
-                        customer_unit = \'"""+ unit+ """\',
-                        customer_city = \'"""+ city+ """\',
-                        customer_state = \'"""+ state+ """\',
-                        customer_zip = \'"""+ zip_code+ """\',
-                        customer_lat = \'"""+ latitude+ """\',
-                        customer_long = \'"""+ longitude+ """\',
-                        password_salt = \'"""+ salt+ """\',
-                        password_hashed = \'"""+ password+ """\',
-                        password_algorithm = \'"""+ algorithm+ """\',
-                        referral_source = \'"""+ referral+ """\',
-                        role = \'"""+ role+ """\',
-                        user_social_media = \'"""+ user_social_signup+ """\',
+                        customer_created_at = \'""" + (datetime.now()).strftime("%Y-%m-%d %H:%M:%S") + """\',
+                        customer_first_name = \'""" + firstName + """\',
+                        customer_last_name = \'""" + lastName + """\',
+                        customer_phone_num = \'""" + phone + """\',
+                        customer_address = \'""" + address + """\',
+                        customer_unit = \'""" + unit + """\',
+                        customer_city = \'""" + city + """\',
+                        customer_state = \'""" + state + """\',
+                        customer_zip = \'""" + zip_code + """\',
+                        customer_lat = \'""" + latitude + """\',
+                        customer_long = \'""" + longitude + """\',
+                        password_salt = \'""" + salt + """\',
+                        password_hashed = \'""" + password + """\',
+                        password_algorithm = \'""" + algorithm + """\',
+                        referral_source = \'""" + referral + """\',
+                        role = \'""" + role + """\',
+                        user_social_media = \'""" + user_social_signup + """\',
                         social_timestamp  =  DATE_ADD(now() , INTERVAL 14 DAY)
-                        WHERE customer_uid = \'"""+ cust_id+ """\';
+                        WHERE customer_uid = \'""" + cust_id + """\';
                     """
                 ]
 
@@ -1514,16 +1527,15 @@ class createAccount(Resource):
 
                 # check if there is a same customer_id existing
                 query = (
-                    """
+                        """
                         SELECT customer_email FROM io.customers
                         WHERE customer_email = \'"""
-                    + email
-                    + "';"
+                        + email
+                        + "';"
                 )
                 print("email---------")
                 items = execute(query, "get", conn)
                 if items["result"]:
-
                     items["result"] = ""
                     items["code"] = 409
                     items["message"] = "Email address has already been taken."
@@ -1531,7 +1543,6 @@ class createAccount(Resource):
                     return items
 
                 if items["code"] == 480:
-
                     items["result"] = ""
                     items["code"] = 480
                     items["message"] = "Internal Server Error."
@@ -1572,32 +1583,32 @@ class createAccount(Resource):
                         VALUES
                         (
                         
-                            \'"""+ NewUserID+ """\',
-                            \'"""+ (datetime.now()).strftime("%Y-%m-%d %H:%M:%S")+ """\',
-                            \'"""+ firstName+ """\',
-                            \'"""+ lastName+ """\',
-                            \'"""+ phone+ """\',
-                            \'"""+ email+ """\',
-                            \'"""+ address+ """\',
-                            \'"""+ unit+ """\',
-                            \'"""+ city+ """\',
-                            \'"""+ state+ """\',
-                            \'"""+ zip_code+ """\',
-                            \'"""+ latitude+ """\',
-                            \'"""+ longitude+ """\',
-                            \'"""+ salt+ """\',
-                            \'"""+ password+ """\',
-                            \'"""+ algorithm+ """\',
-                            \'"""+ referral+ """\',
-                            \'"""+ role+ """\',
-                            \'"""+ user_social_signup+ """\',
-                            \'"""+ user_access_token+ """\',
+                            \'""" + NewUserID + """\',
+                            \'""" + (datetime.now()).strftime("%Y-%m-%d %H:%M:%S") + """\',
+                            \'""" + firstName + """\',
+                            \'""" + lastName + """\',
+                            \'""" + phone + """\',
+                            \'""" + email + """\',
+                            \'""" + address + """\',
+                            \'""" + unit + """\',
+                            \'""" + city + """\',
+                            \'""" + state + """\',
+                            \'""" + zip_code + """\',
+                            \'""" + latitude + """\',
+                            \'""" + longitude + """\',
+                            \'""" + salt + """\',
+                            \'""" + password + """\',
+                            \'""" + algorithm + """\',
+                            \'""" + referral + """\',
+                            \'""" + role + """\',
+                            \'""" + user_social_signup + """\',
+                            \'""" + user_access_token + """\',
                             DATE_ADD(now() , INTERVAL 14 DAY),
-                            \'"""+ user_refresh_token+ """\',
-                            \'"""+ mobile_access_token+ """\',
-                            \'"""+ mobile_refresh_token+ """\',
-                            \'"""+ social_id+ """\');"""
-                        ]
+                            \'""" + user_refresh_token + """\',
+                            \'""" + mobile_access_token + """\',
+                            \'""" + mobile_refresh_token + """\',
+                            \'""" + social_id + """\');"""
+                ]
             print(customer_insert_query[0])
             items = execute(customer_insert_query[0], "post", conn)
 
@@ -1691,6 +1702,7 @@ class createAccount(Resource):
         finally:
             disconnect(conn)
 
+
 class AccountSalt(Resource):
     def post(self):
         response = {}
@@ -1702,7 +1714,7 @@ class AccountSalt(Resource):
             print(data)
             email = data["email"]
             query = (
-                """
+                    """
                     SELECT password_algorithm, 
                             password_salt,
                             user_social_media 
@@ -1718,9 +1730,9 @@ class AccountSalt(Resource):
                 return items
             if items["result"][0]["user_social_media"] != "NULL":
                 items["message"] = (
-                    """Social Signup exists. Use \'"""
-                    + items["result"][0]["user_social_media"]
-                    + """\' """
+                        """Social Signup exists. Use \'"""
+                        + items["result"][0]["user_social_media"]
+                        + """\' """
                 )
                 items["code"] = 401
                 return items
@@ -1731,6 +1743,7 @@ class AccountSalt(Resource):
             raise BadRequest("Request failed, please try again later.")
         finally:
             disconnect(conn)
+
 
 class Login(Resource):
     def post(self):
@@ -1744,7 +1757,7 @@ class Login(Resource):
             social_id = data.get("social_id")
             signup_platform = data.get("signup_platform")
             query = (
-                """
+                    """
                     # CUSTOMER QUERY 1: LOGIN
                     SELECT customer_uid,
                         customer_last_name,
@@ -1781,9 +1794,9 @@ class Login(Resource):
 
                 # checks if login was by social media
                 if (
-                    password
-                    and items["result"][0]["user_social_media"] != "NULL"
-                    and items["result"][0]["user_social_media"] != None
+                        password
+                        and items["result"][0]["user_social_media"] != "NULL"
+                        and items["result"][0]["user_social_media"] != None
                 ):
                     response["message"] = "Need to login by Social Media"
                     response["code"] = 401
@@ -1791,8 +1804,8 @@ class Login(Resource):
 
                 # nothing to check
                 elif (password is None and social_id is None) or (
-                    password is None
-                    and items["result"][0]["user_social_media"] == "NULL"
+                        password is None
+                        and items["result"][0]["user_social_media"] == "NULL"
                 ):
                     response["message"] = "Enter password else login from social media"
                     response["code"] = 405
@@ -1800,8 +1813,8 @@ class Login(Resource):
 
                 # compare passwords if user_social_media is false
                 elif (
-                    items["result"][0]["user_social_media"] == "NULL"
-                    or items["result"][0]["user_social_media"] == None
+                        items["result"][0]["user_social_media"] == "NULL"
+                        or items["result"][0]["user_social_media"] == None
                 ) and password is not None:
 
                     if items["result"][0]["password_hashed"] != password:
@@ -1811,7 +1824,7 @@ class Login(Resource):
                         return items
 
                     if ((items["result"][0]["email_verified"]) == "0") or (
-                        items["result"][0]["email_verified"] == "FALSE"
+                            items["result"][0]["email_verified"] == "FALSE"
                     ):
                         response["message"] = "Account need to be verified by email."
                         response["code"] = 407
@@ -1822,9 +1835,9 @@ class Login(Resource):
 
                     if signup_platform != items["result"][0]["user_social_media"]:
                         items["message"] = (
-                            "Wrong social media used for signup. Use '"
-                            + items["result"][0]["user_social_media"]
-                            + "'."
+                                "Wrong social media used for signup. Use '"
+                                + items["result"][0]["user_social_media"]
+                                + "'."
                         )
                         items["result"] = ""
                         items["code"] = 411
@@ -1850,7 +1863,7 @@ class Login(Resource):
                 del items["result"][0]["email_verified"]
 
                 query = (
-                    "SELECT * from io.customers WHERE customer_email = '" + email + "';"
+                        "SELECT * from io.customers WHERE customer_email = '" + email + "';"
                 )
                 items = execute(query, "get", conn)
                 items["message"] = "Authenticated successfully."
@@ -1862,16 +1875,19 @@ class Login(Resource):
         finally:
             disconnect(conn)
 
-class stripe_key(Resource):
-    
-    def get(self, desc):    
-        print(desc)      
-        if desc == 'IOTEST':
-            return {'publicKey': stripe_public_test_key} 
-        else:             
-            return {'publicKey': stripe_public_live_key} 
 
-# -- DEFINE APIS -------------------------------------------------------------------------------
+class stripe_key(Resource):
+
+    def get(self, desc):
+        print(desc)
+        if desc == 'IOTEST':
+            return {'publicKey': stripe_public_test_key}
+        else:
+            return {'publicKey': stripe_public_live_key}
+
+        # -- DEFINE APIS -------------------------------------------------------------------------------
+
+
 # Define API routes
 api.add_resource(createGame, "/api/v2/createGame")
 api.add_resource(checkGame, "/api/v2/checkGame/<string:game_code>")
@@ -1885,7 +1901,8 @@ api.add_resource(selectDeck, "/api/v2/selectDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
 api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>,<string:round_number>")
 api.add_resource(submitCaption, "/api/v2/submitCaption")
-api.add_resource(getPlayersRemainingToSubmitCaption, "/api/v2/getPlayersRemainingToSubmitCaption/<string:game_code>,<string:round_number>")
+api.add_resource(getPlayersRemainingToSubmitCaption,
+                 "/api/v2/getPlayersRemainingToSubmitCaption/<string:game_code>,<string:round_number>")
 api.add_resource(getAllSubmittedCaptions, "/api/v2/getAllSubmittedCaptions/<string:game_code>,<string:round_number>")
 api.add_resource(voteCaption, "/api/v2/voteCaption")
 api.add_resource(getPlayersWhoHaventVoted, "/api/v2/getPlayersWhoHaventVoted/<string:game_code>,<string:round_number>")
@@ -1894,6 +1911,11 @@ api.add_resource(updateScores, "/api/v2/updateScores/<string:game_code>,<string:
 api.add_resource(getScoreBoard, "/api/v2/getScoreBoard/<string:game_code>,<string:round_number>")
 api.add_resource(startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>")
 api.add_resource(getImageForPlayers, "/api/v2/getImageForPlayers/<string:game_code>,<string:round_number>")
+api.add_resource(endGame, "/api/v2/endGame/<string:game_code>")
+
+
+
+
 
 # reference APIs
 api.add_resource(CreateAppointment, "/api/v2/createAppointment")
@@ -1904,7 +1926,6 @@ api.add_resource(createAccount, "/api/v2/createAccount")
 api.add_resource(AccountSalt, "/api/v2/AccountSalt")
 api.add_resource(Login, "/api/v2/Login/")
 api.add_resource(stripe_key, '/api/v2/stripe_key/<string:desc>')
-
 
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
