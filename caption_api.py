@@ -745,7 +745,7 @@ class gameTimer(Resource):
             # round_duration = 0
             current_time = getNow()
             get_game_timer_info = '''
-                                SELECT captions.round.round_started_at, captions.game.time_limit
+                                SELECT captions.round.round_started_at, captions.game.time_limit, captions.game.num_rounds
                                 FROM captions.round
                                 JOIN captions.game
                                 ON captions.round.round_game_uid = captions.game.game_uid
@@ -762,6 +762,7 @@ class gameTimer(Resource):
                 round_duration = timer["result"][0]["time_limit"]
                 response["round_started_at"] = round_start_time
                 response["round_duration"] = round_duration
+                response["total_number_of_rounds"] = timer["result"][0]["num_rounds"]
                 return response, 200
         except:
             raise BadRequest("Get game timer request failed")
