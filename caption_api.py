@@ -313,6 +313,13 @@ def get_new_userUID(conn):
     return "Could not generate new user UID", 500
 
 
+def get_new_historyUID(conn):
+    newHistoryQuery = execute("CALL captions.new_history_uid()", 'get', conn)
+    if newHistoryQuery['code'] == 280:
+        return newHistoryQuery['result'][0]['new_id']
+    return "Could not generate new history UID", 500
+
+
 def get_new_paymentID(conn):
     newPaymentQuery = execute("CALL new_payment_uid", 'get', conn)
     if newPaymentQuery['code'] == 280:
@@ -1214,11 +1221,54 @@ class endGame(Resource):
     def get(self, game_code):
         print("game code: ", game_code)
         response = {}
-        items = {}
+        history_object = {}
         try:
             conn = connect()
-            response["message"] = "281, end game request successful."
-            return response, 200
+            get_game_info_query = '''select json_object('round_number', round_number, 
+                                                        'round_deck_uid', round_deck_uid, 
+                                                        'round_image_uid', round_image_uid
+                                                        ) as json_round_info, 
+                                                    json_arrayagg(
+                                                              json_object('round_user_uid', round_user_uid,
+                                                              'caption', caption, 
+                                                              'votes', votes,
+                                                              'score', score)
+                                                    ) as json_user_object from captions.round 
+                                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game 
+                                                        WHERE game_code=\'''' + game_code + '''\')
+                                                    group by round_number;
+                                                    '''
+            game_info = execute(get_game_info_query, "get", conn)
+            # print("game_info: ", game_info)
+            if game_info["code"] == 280:
+                print("num_rounds:", len(game_info["result"]))
+                for i in range(len(game_info["result"])):
+                    key = "round "+str(i+1)
+                    history_object[key] = {}
+                    round_info = json.loads(game_info["result"][i]["json_round_info"])
+                    # print(round_info, type(round_info))
+                    history_object[key]["round_deck_uid"] = round_info["round_deck_uid"]
+                    history_object[key]["round_image_uid"] = round_info["round_image_uid"]
+                    user_info_str = json.loads(game_info["result"][i]["json_user_object"])
+                    history_object[key]["user_data"] = user_info_str
+                    # print(user_info_str, type(user_info_str))
+
+                # print(history_object)
+                json_history_object = json.dumps(history_object, indent=4)
+                # print(json_history_object)
+                new_history_uid = get_new_historyUID(conn)
+                update_history_table = '''
+                                        INSERT INTO captions.game_history
+                                        SET history_uid = \'''' + new_history_uid + '''\',
+                                            history_game_uid = (SELECT game_uid FROM captions.game
+                                                    WHERE game_code=\'''' + game_code + '''\'),
+                                            history_obj = \'''' + json_history_object + '''\'
+                                        '''
+                history_update = execute(update_history_table, "post", conn)
+                # print("history_update_info: ", history_update)
+                if history_update["code"] == 281:
+                    response["message"] = "281, end game request successful."
+                    return response, 200
         except:
             raise BadRequest("end game Request failed")
         finally:
