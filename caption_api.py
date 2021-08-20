@@ -836,6 +836,72 @@ class startPlaying(Resource):
             disconnect(conn)
 
 
+class getUniqueImageInRound(Resource):
+    def get(self, game_code, round_number):
+        print("requested game_code: ", game_code)
+        print("requested round_number: ", round_number)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            get_images_query = '''
+                            SELECT distinct(captions.deck.deck_image_uids), captions.round.round_image_uid
+                            FROM captions.round
+                            INNER Join captions.deck
+                            ON captions.round.round_deck_uid=captions.deck.deck_uid
+                            WHERE round_game_uid =  (SELECT game_uid FROM captions.game 
+                            WHERE game_code=\'''' + game_code + '''\')                                
+                            '''
+            image_info = execute(get_images_query, "get", conn)
+
+            print("image info: ", image_info)
+            if image_info["code"] == 280:
+                images_in_deck_str = image_info["result"][0]["deck_image_uids"][2:-2]#.split(', ')
+                images_in_deck_str = images_in_deck_str.replace('"', " ")
+                images_in_deck = images_in_deck_str.split(" ,  ")
+                images_used = set()
+                for result in image_info["result"]:
+                    if result["round_image_uid"] not in images_used:
+                        images_used.add(result["round_image_uid"])
+                # print(images_in_deck, type(images_in_deck))
+                # print(images_used, type(images_used))
+                flag = True
+                image_uid = ""
+                while flag:
+                    index = random.randint(0, len(images_in_deck))
+                    if images_in_deck[index] not in images_used:
+                        image_uid = images_in_deck[index]
+                        flag = False
+
+                print("next_image_uid: ", image_uid, type(image_uid))
+
+                response["message1"] = "280, get image request successful."
+                get_image_url_query = '''
+                                    SELECT image_url FROM captions.image
+                                    WHERE image_uid=\'''' + image_uid + '''\'
+                                    '''
+                image_url = execute(get_image_url_query, "get", conn)
+                print("image_url: ", image_url)
+                if image_url["code"] == 280:
+                    write_to_round_query = '''
+                                        UPDATE captions.round
+                                        SET round_image_uid=\'''' + image_uid + '''\'
+                                        WHERE round_game_uid=(SELECT game_uid FROM captions.game
+                                        WHERE game_code=\'''' + game_code + '''\')
+                                        AND round_number = \'''' + round_number + '''\'
+                                        '''
+                    updated_round = execute(write_to_round_query, "post", conn)
+                    print("game_attr_update info: ", updated_round)
+                    if updated_round["code"] == 281:
+                        response["message"] = "281, image in the Round updated."
+                        response["image_url"] = image_url["result"][0]["image_url"]
+                        return response, 200
+        except:
+            raise BadRequest("Get image in round request failed")
+        finally:
+            disconnect(conn)
+
+
 class getImageInRound(Resource):
     def get(self, game_code, round_number):
         print("requested game_code: ", game_code)
@@ -1963,7 +2029,7 @@ api.add_resource(getScoreBoard, "/api/v2/getScoreBoard/<string:game_code>,<strin
 api.add_resource(startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>")
 api.add_resource(getImageForPlayers, "/api/v2/getImageForPlayers/<string:game_code>,<string:round_number>")
 api.add_resource(endGame, "/api/v2/endGame/<string:game_code>")
-
+api.add_resource(getUniqueImageInRound, "/api/v2/getUniqueImageInRound/<string:game_code>,<string:round_number>")
 
 
 
