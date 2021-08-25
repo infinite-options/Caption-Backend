@@ -981,6 +981,7 @@ class submitCaption(Resource):
             # print to Received data to Terminal
             print("Received:", data)
             caption = data["caption"]
+            caption = caption.replace("'", '"')
             round_number = data["round_number"]
             game_code = data["game_code"]
             user_uid = data["user_uid"]
