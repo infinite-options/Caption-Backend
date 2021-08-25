@@ -1198,6 +1198,7 @@ class updateScores(Resource):
                                                 WHERE game_code=\'''' + game_code + '''\') 
                                             AND round_number=\'''' + round_number + '''\'
                                             AND votes<\'''' + highest_votes + '''\'
+                                            ORDER BY votes DESC
                                             '''
                 runner_up = execute(get_second_highest_votes, "get", conn)
                 print("runner-up info:", runner_up)
