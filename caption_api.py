@@ -521,7 +521,7 @@ class createNewGame(Resource):
                     game_code = \'''' + str(game_code) + '''\',
                     num_rounds = \'''' + num_rounds + '''\',
                     time_limit = \'''' + time_limit + '''\',
-                    game_host_uid = \'''' + new_user_uid + '''\'
+                    game_host_uid = \'''' + new_user_uid + '''\',
                     scoring_scheme = \'''' + scoring_scheme + '''\'
                     '''
                 game_items = execute(create_game_query, "post", conn)
