@@ -960,7 +960,9 @@ class getImageForPlayers(Resource):
                             ON captions.image.image_uid = captions.round.round_image_uid
                             WHERE round_game_uid = (SELECT game_uid FROM captions.game
                             WHERE game_code=\'''' + game_code + '''\')
-                            AND round_number=MAX(round_number)              
+                            AND round_number=(SELECT MAX(round_number) FROM captions.round 
+                                            WHERE round_game_uid = (SELECT game_uid FROM captions.game
+                                            WHERE game_code=\'''' + game_code + '''\'))             
                             '''
             image_info = execute(get_image_query, "get", conn)
 
