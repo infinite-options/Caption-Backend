@@ -1243,7 +1243,7 @@ class updateScores(Resource):
                     elif scoring == "V":
                         update_score_by_votes_query = '''
                                                         UPDATE captions.round
-                                                        SET score = 2*votes
+                                                        SET score = 2 * votes
                                                         WHERE round_game_uid=(SELECT game_uid FROM captions.game 
                                                                 WHERE game_code=\'''' + game_code + '''\')
                                                         AND round_number=\'''' + round_number + '''\'
