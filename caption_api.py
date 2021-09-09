@@ -621,27 +621,41 @@ class joinGame(Resource):
                     print("new user info: ", new_user)
                 if returning_user["code"] == 280 or new_user["code"] == 281:
                     # add the user to round from the game id
-                    new_round_uid = get_new_roundUID(conn)
-                    add_user_to_round_query = '''
-                                            INSERT INTO captions.round
-                                            SET round_uid = \'''' + new_round_uid + '''\',
-                                            round_game_uid = \'''' + game_uid + '''\',
-                                            round_user_uid = \'''' + user_uid + '''\',
-                                            round_number = 1,
-                                            round_deck_uid = NULL,
-                                            round_image_uid = NULL ,
-                                            caption = NULL,
-                                            votes = 0,
-                                            score = 0,
-                                            round_started_at = NULL'''
-                    add_user = execute(add_user_to_round_query, "post", conn)
-                    print("add_user_response: ", add_user)
-                    if add_user["code"] == 281:
-                        response["message"] = "Player added to the game."
-                        response["game_uid"] = game_uid
-                        response["user_uid"] = user_uid
-                        response["user_alias"] = user_alias
-                        return response, 200
+                    check_user_in_game_query = '''
+                                                SELECT round_user_uid FROM captions.round
+                                                WHERE round_game_uid = \'''' + game_uid + '''\'
+                                                AND round_user_uid = \'''' + user_uid + '''\'
+                                                '''
+                    existing_player = execute(check_user_in_game_query, "get", conn)
+                    print("player_info: ", existing_player)
+                    
+                    if existing_player["code"] == 280:
+                        if len(existing_player["result"]) > 0:
+                            response["message"] = "280, Player has already joined the game."
+                            response["user_uid"] = user_uid
+                            return response, 200
+                        else:
+                            new_round_uid = get_new_roundUID(conn)
+                            add_user_to_round_query = '''
+                                                    INSERT INTO captions.round
+                                                    SET round_uid = \'''' + new_round_uid + '''\',
+                                                    round_game_uid = \'''' + game_uid + '''\',
+                                                    round_user_uid = \'''' + user_uid + '''\',
+                                                    round_number = 1,
+                                                    round_deck_uid = NULL,
+                                                    round_image_uid = NULL ,
+                                                    caption = NULL,
+                                                    votes = 0,
+                                                    score = 0,
+                                                    round_started_at = NULL'''
+                            add_user = execute(add_user_to_round_query, "post", conn)
+                            print("add_user_response: ", add_user)
+                            if add_user["code"] == 281:
+                                response["message"] = "Player added to the game."
+                                response["game_uid"] = game_uid
+                                response["user_uid"] = user_uid
+                                response["user_alias"] = user_alias
+                                return response, 200
             else:
                 response["warning"] = "Invalid game code."
 
