@@ -1195,8 +1195,8 @@ class updateScores(Resource):
             print("scoring info: ", scoring_info)
             if scoring_info["code"] == 280:
                 scoring = scoring_info["result"][0]["scoring_scheme"]
-
-                if scoring == "R":
+                print(scoring)
+                if scoring == "R" or scoring == 'r':
                     highest_votes = 0
                     second_highest_votes = 0
                     get_highest_votes = '''
@@ -1240,18 +1240,19 @@ class updateScores(Resource):
                             if update_scores["code"] == 281:
                                 response["message"] = "281, update scoreboard by ranking request successful."
                                 return response, 200
-                    elif scoring == "V":
-                        update_score_by_votes_query = '''
-                                                        UPDATE captions.round
-                                                        SET score = 2 * votes
-                                                        WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                                                WHERE game_code=\'''' + game_code + '''\')
-                                                        AND round_number=\'''' + round_number + '''\'
-                                                        '''
-                        update_scores = execute(update_score_by_votes_query, "post", conn)
-                        if update_scores["code"] == 281:
-                            response["message"] = "281, update scoreboard by votes request successful."
-                            return response, 200
+                elif scoring == "V" or scoring == 'v':
+                    update_score_by_votes_query = '''
+                                                    UPDATE captions.round
+                                                    SET score = 2 * votes
+                                                    WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                                            WHERE game_code=\'''' + game_code + '''\')
+                                                    AND round_number=\'''' + round_number + '''\'
+                                                    '''
+                    update_scores = execute(update_score_by_votes_query, "post", conn)
+                    print("update_score_info: ", update_scores)
+                    if update_scores["code"] == 281:
+                        response["message"] = "281, update scoreboard by votes request successful."
+                        return response, 200
         except:
             raise BadRequest("update scoreboard request failed")
         finally:
