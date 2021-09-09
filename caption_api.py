@@ -1172,7 +1172,6 @@ class getScoreBoard(Resource):
                                 WHERE round_game_uid = (SELECT game_uid FROM captions.game
                                 WHERE game_code=\'''' + game_code + '''\')
                                 AND round_number=\'''' + round_number + '''\'
-                                AND caption IS NOT NULL
                                 '''
                 scoreboard = execute(get_score_query, "get", conn)
                 print("score info: ", scoreboard)
