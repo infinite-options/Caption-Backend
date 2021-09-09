@@ -1001,7 +1001,7 @@ class submitCaption(Resource):
             data = request.get_json(force=True)
             # print to Received data to Terminal
             print("Received:", data)
-            caption = data["caption"] if len(data["captions"]) > 0 else pymysql.NULL
+            caption = data["caption"]
             caption = caption.replace("'", '"')
             round_number = data["round_number"]
             game_code = data["game_code"]
