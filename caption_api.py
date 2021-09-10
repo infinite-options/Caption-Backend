@@ -157,13 +157,37 @@ RDS_PW = "prashant"
 # RDS_PW = RdsPw()
 
 
-# s3 = boto3.client('s3')
+s3 = boto3.client('s3')
+s3_res = boto3.resource('s3')
+s3_cl = boto3.client('s3')
 
 # aws s3 bucket where the image is stored
 # BUCKET_NAME = os.environ.get('MEAL_IMAGES_BUCKET')
-# BUCKET_NAME = 'servingnow'
+BUCKET_NAME = 'iocaptions'
 # allowed extensions for uploading a profile photo file
 ALLOWED_EXTENSIONS = set(["png", "jpg", "jpeg"])
+
+def allowed_file(filename):
+    """Checks if the file is allowed to upload"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def helper_upload_user_img(file, key):
+    print("uploading image to s3 bucket.")
+    bucket = 'iocaptions'
+    if file and allowed_file(file.filename):
+        filename = 'https://' + bucket+ '.s3.us-west-1.amazonaws.com/' \
+                   + str(bucket) + '/' + str(key)
+
+        upload_file = s3.put_object(
+            Bucket=bucket,
+            Body=file,
+            Key=key,
+            ACL='public-read',
+            ContentType='image/jpeg'
+        )
+        return filename
+    return None
+
 
 # For Push notification
 isDebug = False
@@ -319,27 +343,13 @@ def get_new_historyUID(conn):
         return newHistoryQuery['result'][0]['new_id']
     return "Could not generate new history UID", 500
 
-
-def get_new_paymentID(conn):
-    newPaymentQuery = execute("CALL new_payment_uid", 'get', conn)
-    if newPaymentQuery['code'] == 280:
-        return newPaymentQuery['result'][0]['new_id']
-    return "Could not generate new payment ID", 500
-
-
-def get_new_contactUID(conn):
-    newPurchaseQuery = execute("CALL io.new_contact_uid()", 'get', conn)
-    if newPurchaseQuery['code'] == 280:
-        return newPurchaseQuery['result'][0]['new_id']
-    return "Could not generate new contact UID", 500
-
-
-def get_new_appointmentUID(conn):
-    newAppointmentQuery = execute("CALL io.new_appointment_uid()", 'get', conn)
-    if newAppointmentQuery['code'] == 280:
-        return newAppointmentQuery['result'][0]['new_id']
-    return "Could not generate new appointment UID", 500
-
+def get_new_imageUID(conn):
+    # print("getting new image")
+    newImageQuery = execute("CALL captions.new_image_uid()", 'get', conn)
+    # print(newImageQuery)
+    if newImageQuery['code'] == 280:
+        return newImageQuery['result'][0]['new_id']
+    return "Could not generate new image UID", 500
 
 # --Caption Queries start here -------------------------------------------------------------------------------
 
@@ -1384,8 +1394,49 @@ class endGame(Resource):
         finally:
             disconnect(conn)
 
+class uploadImage(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            print("receiving_data")
+            image_title = request.form.get("image_title")
+            print("image_title: ", image_title)
+            image_cost = request.form.get("image_cost")
+            print("image_cost: ", image_cost)
+            image_description = request.form.get("image_description")
+            print("image_description: ", image_description)
+            image = request.files.get("image_file")
+            print("image: ", image)
+            new_image_uid = get_new_imageUID(conn)
+            print("new_image_uid: ", new_image_uid)
 
-        # -- DEFINE APIS -------------------------------------------------------------------------------
+            key = "caption_image/" + str(new_image_uid)
+            print("image_key: ", key)
+
+            image_url = helper_upload_user_img(image, key)
+            print("image_url: ", image_url)
+
+            add_image_query = '''
+                            INSERT INTO captions.image
+                            SET image_uid = \'''' + new_image_uid + '''\',
+                                image_title = \'''' + image_title + '''\',
+                                image_url = \'''' + image_url + '''\',
+                                image_cost = \'''' + image_cost + '''\',
+                                image_description = \'''' + image_description + '''\'                    
+                            ''' 
+            image_response = execute(add_image_query, "post", conn)
+            print("image_response: ", image_response)
+            if image_response["code"] == 281:
+                response["message"] = "281, image successfully added to the database."
+                return response, 200
+        except:
+            raise BadRequest("upload image Request failed")
+        finally:
+            disconnect(conn)
+
+# -- DEFINE APIS -------------------------------------------------------------------------------
 
 
 # Define API routes
@@ -1413,7 +1464,7 @@ api.add_resource(startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:
 api.add_resource(getImageForPlayers, "/api/v2/getImageForPlayers/<string:game_code>,<string:round_number>")
 api.add_resource(endGame, "/api/v2/endGame/<string:game_code>")
 api.add_resource(getUniqueImageInRound, "/api/v2/getUniqueImageInRound/<string:game_code>,<string:round_number>")
-
+api.add_resource(uploadImage, "/api/v2/uploadImage")
 
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
