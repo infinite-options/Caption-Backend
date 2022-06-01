@@ -175,8 +175,9 @@ def helper_upload_user_img(file, key):
     print("uploading image to s3 bucket.")
     bucket = 'iocaptions'
     if file and allowed_file(file.filename):
-        filename = 'https://' + bucket+ '.s3.us-west-1.amazonaws.com/' \
-                   + str(bucket) + '/' + str(key)
+        # filename = 'https://' + bucket+ '.s3.us-west-1.amazonaws.com/' \
+        #            + str(bucket) + '/' + str(key)
+        filename = 'https://' + bucket+ '.s3.us-west-1.amazonaws.com/' + str(key)
 
         upload_file = s3.put_object(
             Bucket=bucket,
