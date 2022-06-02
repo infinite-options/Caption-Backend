@@ -1,4 +1,4 @@
-# To run program:  python3 io_api.py
+    # To run program:  python3 io_api.py
 
 # README:  if conn error make sure password is set properly in RDS PASSWORD section
 
@@ -263,7 +263,7 @@ def execute(sql, cmd, conn, skipSerialization=False):
             print("before query")
             cur.execute(sql)
             print("after query")
-            if cmd is "get":
+            if cmd == "get":
                 result = cur.fetchall()
                 response["message"] = "Successfully executed SQL query."
                 # Return status code of 280 for successful GET request
@@ -271,7 +271,7 @@ def execute(sql, cmd, conn, skipSerialization=False):
                 if not skipSerialization:
                     result = serializeResponse(result)
                 response["result"] = result
-            elif cmd in "post":
+            elif cmd == "post":
                 print("in POST")
                 conn.commit()
                 print("after commit")
