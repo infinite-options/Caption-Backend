@@ -60,6 +60,8 @@ import pytz
 import pymysql
 import requests
 
+from random import randint
+
 RDS_HOST = "io-mysqldb8.cxjnrciilyjq.us-west-1.rds.amazonaws.com"
 RDS_PORT = 3306
 RDS_USER = "admin"
@@ -94,10 +96,14 @@ stripe.api_key = stripe_secret_test_key
 CORS(app)
 
 # --------------- Mail Variables ------------------
-app.config["MAIL_USERNAME"] = os.environ.get("EMAIL")
-app.config["MAIL_PASSWORD"] = os.environ.get("PASSWORD")
-# app.config['MAIL_USERNAME'] = ''
-# app.config['MAIL_PASSWORD'] = ''
+# "SUPPORT_EMAIL": "",
+# "SUPPORT_PASSWORD": "",
+# app.config["MAIL_USERNAME"] = os.environ.get("EMAIL")
+# app.config["MAIL_PASSWORD"] = os.environ.get("PASSWORD")
+
+app.config["MAIL_USERNAME"] = os.environ.get("SUPPORT_EMAIL")
+app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
+
 
 # Setting for mydomain.com
 app.config["MAIL_SERVER"] = "smtp.mydomain.com"
@@ -1410,6 +1416,11 @@ class uploadImage(Resource):
             print("image_description: ", image_description)
             image = request.files.get("image_file")
             print("image: ", image)
+
+            #deck name
+            deck_name = request.form.get("deck_name")
+            print("deck_name: ", deck_name)
+
             new_image_uid = get_new_imageUID(conn)
             print("new_image_uid: ", new_image_uid)
 
@@ -1429,6 +1440,15 @@ class uploadImage(Resource):
                             ''' 
             image_response = execute(add_image_query, "post", conn)
             print("image_response: ", image_response)
+
+
+            add_to_deck_query = '''
+                            SELECT deck_image_uids
+                            FROM captions.deck                    
+                            '''
+            deck_response = execute(add_to_deck_query, "post", conn)
+            print("deck_response: ", deck_response)
+
             if image_response["code"] == 281:
                 response["message"] = "281, image successfully added to the database."
                 return response, 200
@@ -1436,6 +1456,473 @@ class uploadImage(Resource):
             raise BadRequest("upload image Request failed")
         finally:
             disconnect(conn)
+
+class CheckEmailValidated(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        cus_id = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            print("Received:", data)
+
+            name = data["name"]
+            email = data["email"]
+            phone_no = data["phone_no"]
+            message = data["message"]
+
+            print("name", name)
+            print("email", email)
+            print("phone_no", phone_no)
+            print("message", message)
+
+
+            # CHECK THE DATABASE FOR THE EXISTING STATE OF THE EMAIL_VALIDATED COLUMN.
+            get_verification_code_query = '''
+                                SELECT user_uid, email_validated FROM captions.user WHERE user_email=\'''' + email + '''\'
+                                '''
+            validation = execute(get_verification_code_query, "get", conn)
+            print("validation info: ", validation)
+
+
+            if len(validation["result"]) == 0:
+                print("List is empty --> Please create a new user")
+                response[message] = "User does not exist. Please create an account with this email."
+                return response, 200
+            else:
+                print("first element of list", validation["result"][0])
+
+            print("User info retrieved --> Checking status of email_validated")
+            if validation["result"][0]["email_validated"] != 'TRUE':
+                code = randint(100,999)
+                print("Email validation code will be set to: ", code)
+                phone_no += str(code)
+                print("Phone #", phone_no)
+                user_uid = validation["result"][0]["user_uid"]
+
+                #Want to remain in safe mode and change only one row? Use this query!
+                set_code_query1 = '''
+                                            UPDATE captions.user
+                                            SET email_validated = \'''' + str(code) + '''\' 
+                                            WHERE user_uid =\'''' + user_uid + '''\' 
+                                            AND user_email=\'''' + email + '''\'
+                                            '''
+
+                #Want to break some rules and possibly change multiple rows at a time? Use this one.
+                set_code_query2 = '''
+                                UPDATE captions.user
+                                SET email_validated =\'''' + str(code) + '''\'
+                                WHERE user_email=\'''' + email + '''\'
+                                '''
+                #print("valid modified example query\n", set_code_query)
+                updateQueryResult = execute(set_code_query2, "post", conn)
+                print("Result of update query: ", updateQueryResult["message"])
+
+            else:
+                print("abandon ship")
+                response["message"] = "User has already been verified."
+                return response, 200
+                disconnect(conn)
+
+            #SendEmail.get(self, name, email, phone_no, message)
+
+            # #  GET CUSTOMER APPOINTMENT INFO
+            # first_name = data["first_name"]
+            # last_name = data["last_name"]
+            # email = data["email"]
+            # phone_no = data["phone_no"]
+            # treatment_uid = data["appt_treatment_uid"]
+            # notes = data["notes"]
+            # datevalue = data["appt_date"]
+            # timevalue = data["appt_time"]
+            # purchase_price = data["purchase_price"]
+            # purchase_date = data["purchase_date"]
+            #
+            # #  PRINT CUSTOMER APPOINTMENT INFO
+            # print("first_name", first_name)
+            # print("last_name", last_name)
+            # print("email", email)
+            # print("phone_no", phone_no)
+            # print("treatment_uid", treatment_uid)
+            # print("notes", notes)
+            # print("date", datevalue)
+            # print("time", timevalue)
+            # print("purchase_price", purchase_price)
+            # print("purchase_date", purchase_date)
+
+            # #  CREATE CUSTOMER APPOINTMENT UID
+            # # Query [0]  Get New UID
+            # # query = ["CALL new_refund_uid;"]
+            # query = ["CALL nitya.new_appointment_uid;"]
+            # NewIDresponse = execute(query[0], "get", conn)
+            # NewID = NewIDresponse["result"][0]["new_id"]
+            # print("NewID = ", NewID)
+            # # NewID is an Array and new_id is the first element in that array
+            #
+            # #  FIND EXISTING CUSTOMER UID
+            # query1 = (
+            #     """
+            #         SELECT customer_uid FROM nitya.customers
+            #         WHERE customer_email = \'"""
+            #     + email
+            #     + """\'
+            #         AND   customer_phone_num = \'"""
+            #     + phone_no
+            #     + """\';
+            #     """
+            # )
+            # cus_id = execute(query1, "get", conn)
+            # print(cus_id["result"])
+            # for obj in cus_id["result"]:
+            #     NewcustomerID = obj["customer_uid"]
+            #     print(NewcustomerID)
+            #
+            # print(len(cus_id["result"]))
+            #
+            # #  FOR NEW CUSTOMERS - CREATE NEW CUSTOMER UID AND INSERT INTO CUSTOMER TABLE
+            # if len(cus_id["result"]) == 0:
+            #     query = ["CALL nitya.new_customer_uid;"]
+            #     NewIDresponse = execute(query[0], "get", conn)
+            #     NewcustomerID = NewIDresponse["result"][0]["new_id"]
+
+                # customer_insert_query = (
+                #     """
+                #     INSERT INTO nitya.customers
+                #     SET customer_uid = \'"""
+                #     + NewcustomerID
+                #     + """\',
+                #         customer_first_name = \'"""
+                #     + first_name
+                #     + """\',
+                #         customer_last_name = \'"""
+                #     + last_name
+                #     + """\',
+                #         customer_phone_num = \'"""
+                #     + phone_no
+                #     + """\',
+                #         customer_email = \'"""
+                #     + email
+                #     + """\'
+                #     """
+                # )
+            #
+            #     customer_items = execute(customer_insert_query, "post", conn)
+            #     print("NewcustomerID=", NewcustomerID)
+            #
+            # #  FOR EXISTING CUSTOMERS - USE EXISTING CUSTOMER UID
+            # else:
+            #     for obj in cus_id["result"]:
+            #         NewcustomerID = obj["customer_uid"]
+            #         print("customerID = ", NewcustomerID)
+
+            #  convert to new format:  payment_time_stamp = \'''' + getNow() + '''\',
+
+            #  INSERT INTO APPOINTMENTS TABLE
+            # query2 = (
+            #     """
+            #         INSERT INTO nitya.appointments
+            #         SET appointment_uid = \'"""
+            #     + NewID
+            #     + """\',
+            #             appt_customer_uid = \'"""
+            #     + NewcustomerID
+            #     + """\',
+            #             appt_treatment_uid = \'"""
+            #     + treatment_uid
+            #     + """\',
+            #             notes = \'"""
+            #     + str(notes)
+            #     + """\',
+            #             appt_date = \'"""
+            #     + datevalue
+            #     + """\',
+            #             appt_time = \'"""
+            #     + timevalue
+            #     + """\',
+            #             purchase_price = \'"""
+            #     + purchase_price
+            #     + """\',
+            #             purchase_date = \'"""
+            #     + purchase_date
+            #     + """\'
+            #         """
+            # )
+            # items = execute(query2, "post", conn)
+            # query3 = (
+            #     """
+            #         SELECT title FROM nitya.treatments
+            #         WHERE treatment_uid = \'"""
+            #     + treatment_uid
+            #     + """\';
+            #     """
+            # )
+            # treatment = execute(query3, "get", conn)
+            # print(treatment['result'][0]['title'])
+            # # Send receipt emails
+            # name = first_name + " " + last_name
+            # message = treatment['result'][0]['title'] + "," + \
+            #     purchase_price + "," + datevalue + "," + timevalue
+            # print(name)
+
+            SendEmail.get(self, name, email, phone_no, message)  #Temporary comment out for testing purposes
+            print("send email successful")
+
+            response["message"] = "Code has been sent to email"
+            response["result"] = items
+            return response, 200
+        except:
+            raise BadRequest("Check Email Validated Request failed, please try again later.")
+        finally:
+            disconnect(conn)
+
+        # ENDPOINT AND JSON OBJECT THAT WORKS
+        # http://localhost:4000/api/v2/createappointment
+
+class CheckEmailValidationCode(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        cus_id = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            print("Received:", data)
+
+
+            email = data["email"]
+            code = data["code"]
+
+            print("email", email)
+            print("code", code)
+
+            get_verification_code_query = '''
+                            SELECT email_validated FROM captions.user WHERE user_email=\'''' + email + '''\'
+                            '''
+
+            validation = execute(get_verification_code_query, "get", conn)
+            print("validation info: ", validation)
+
+            if len(validation["result"]) == 0:
+                print("List is empty --> Please create a new user")
+                response["message"] = "User does not exist. Please create an account with this email."
+                return response, 200
+            else:
+                print("first element of list", validation["result"][0])
+
+            if validation["result"][0]["email_validated"] == code:
+                set_code_query = '''
+                                UPDATE captions.user
+                                SET email_validated =\'''' + "TRUE" + '''\'
+                                WHERE user_email=\'''' + email + '''\'
+                                '''
+                verification = execute(set_code_query, "post", conn)
+                print("User code has been updated to TRUE")
+                response["message"] = "Email has been verified"
+            else:
+                response["message"] = "Invalid Verification Code"
+                # return response, 200
+                # disconnect(conn)
+
+            return response, 200
+        except:
+            raise BadRequest("Create Appt Request failed, please try again later.")
+        finally:
+            disconnect(conn)
+
+        # ENDPOINT AND JSON OBJECT THAT WORKS
+        # http://localhost:4000/api/v2/createappointment
+
+
+# SEND EMAIL
+class SendEmail(Resource):
+    def __call__(self):
+        print("In SendEmail")
+
+    def get(self, name, email, phone, subject):
+        print("In Send EMail get")
+        try:
+            conn = connect()
+            subject = subject.split(',')
+
+            print("name", name)
+            print("email", email)
+            print("phone", phone)
+            code = phone[-3:]
+            print("code", code)
+            print("subject", subject)
+
+            # month_num = subject[2][5:7]
+            # datetime_object1 = datetime.strptime(month_num, "%m")
+            # month_name = datetime_object1.strftime("%B")
+            #
+            # datetime_object2 = datetime.strptime(subject[2], "%Y-%m-%d")
+            # day = datetime_object2.strftime("%A")
+            #
+            # datetime_object3 = datetime.strptime(subject[3], "%H:%M")
+            # time = datetime_object3.strftime("%I:%M %p")
+            # print(time)
+
+            # phone = phone[0:3] + "-" + phone[3:6] + "-" + phone[6:]
+            print(phone)
+            # Send email to Client
+            msg = Message(
+                "Thanks for your Email!",
+                # sender="support@nityaayurveda.com",
+                sender="support@mealsfor.me",
+                # recipients=[email],
+                # recipients=[email, "Lmarathay@yahoo.com",
+                #             "pmarathay@gmail.com"],
+
+                #hello9 (does work)
+                # recipients=[email,
+                #             "pmarathay@gmail.com"],
+
+                #hello10 (does work)
+                # recipients=[email,"pmarathay@gmail.com"]
+
+                # hello11 & hello15 (does work also??)
+                # recipients = [email, "pmarathay@gmail.com"],
+
+                # recipients=["mayukh.das@sjsu.edu"]
+
+                # hello16 (works)
+                # recipients=["pmarathay@gmail.com", "mayukh.das@sjsu.edu"]
+
+                # hello17 ()
+                recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", email]
+            )
+            print("past message")
+            # msg = Message("Test email", sender='support@mealsfor.me', recipients=["pmarathay@gmail.com"])
+            #some kind of function missing?
+            #another reason: missing the env files?
+            print(msg)
+            msg.body = code
+            #msg.body = "hello17"
+            # msg.body = (
+            #     "Hello " + str(name) + "," + "\n"
+            #     "\n"
+            #     "Thank you for making your appointment with us. \n"
+            #     "Here are your  appointment details: \n"
+            #     "Date: " +
+            #     # str(day) + ", " + str(month_name) + " " +
+            #     str(subject[2][8:10]) + ", " + str(subject[2][0:4]) + "\n"
+            #     "Time: " + str(time) + "\n"
+            #     "Location: 6055 Meridian Ave. Suite 40 A, San Jose, CA 95120. \n"
+            #     "\n"
+            #     "Name: " + str(name) + "\n"
+            #     "Phone: " + str(phone) + "\n"
+            #     "Email: " + str(email) + "\n"
+            #     "\n"
+            #     "Package purchased: " + str(subject[0]) + "\n"
+            #     "Total amount paid: " + str(subject[1]) + "\n"
+            #     "\n"
+            #     "If you have any questions please call or text: \n"
+            #     "Leena Marathay at 408-471-7004, \n"
+            #     "Email Leena@nityaayurveda.com \n"
+            #     "\n"
+            #     "Thank you - Nitya Ayurveda\n\n"
+            # )
+            print("past body")
+            print(msg.body)
+            mail.send(msg)
+            print("after mail.send(msg)")
+            print(msg)
+
+            # # print("first email sent")
+            # # Send email to Host
+            # msg = Message(
+            #     "New Email from Website!",
+            #     sender="support@nityaayurveda.com",
+            #     recipients=["Lmarathay@yahoo.com"],
+            # )
+            # msg.body = (
+            #     "Hi !\n\n"
+            #     "You just got an email from your website! \n"
+            #     "Here are the particulars:\n"
+            #     "Name:      " + name + "\n"
+            #     "Email:     " + email + "\n"
+            #     "Phone:     " + phone + "\n"
+            #     "Subject:   " + subject + "\n"
+            # )
+            # "Thx - Nitya Ayurveda\n\n"
+            # # print('msg-bd----', msg.body)
+            # mail.send(msg)
+
+            return "Email Sent", 200
+
+        except:
+            raise BadRequest("Email Request failed, please try again later.")
+        finally:
+            disconnect(conn)
+
+    def post(self):
+
+        try:
+            conn = connect()
+
+            data = request.get_json(force=True)
+            print(data)
+            email = data["email"]
+
+            # msg = Message("Thanks for your Email!", sender='pmarathay@manifestmy.space', recipients=[email])
+            # msg = Message("Thanks for your Email!", sender='info@infiniteoptions.com', recipients=[email])
+            # msg = Message("Thanks for your Email!", sender='leena@nityaayurveda.com', recipients=[email])
+            # msg = Message("Thanks for your Email!", sender='pmarathay@buildsuccess.org', recipients=[email])
+            msg = Message(
+                "Thanks for your Email!",
+                sender="support@nityaayurveda.com",
+                recipients=[email, "Lmarathay@gmail.com",
+                            "pmarathay@gmail.com"],
+            )
+            # msg = Message("Test email", sender='support@mealsfor.me', recipients=["pmarathay@gmail.com"])
+            msg.body = (
+                "Hi !\n\n"
+                "We are looking forward to meeting with you! \n"
+                "Email support@nityaayurveda.com if you need to get in touch with us directly.\n"
+                "Thx - Nitya Ayurveda\n\n"
+            )
+            # print('msg-bd----', msg.body)
+            # print('msg-')
+            mail.send(msg)
+
+            # Send email to Host
+            # msg = Message("Email Verification", sender='support@mealsfor.me', recipients=[email])
+
+            # print('MESSAGE----', msg)
+            # print('message complete')
+            # # print("1")
+            # link = url_for('confirm', token=token, hashed=password, _external=True)
+            # # print("2")
+            # print('link---', link)
+            # msg.body = "Click on the link {} to verify your email address.".format(link)
+            # print('msg-bd----', msg.body)
+            # mail.send(msg)
+            return "Email Sent", 200
+
+        except:
+            raise BadRequest("Request failed, please try again later.")
+        finally:
+            disconnect(conn)
+
+
+#Wow! This is my first customized endpoint. More than happy that it actually works :).
+class goaway(Resource):
+    def get(self):
+        print("go away requested")
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            print("connection established")
+
+            response["message"] = "i told you to go away"
+            return response, 200
+        except:
+            raise BadRequest("Go Away Request Failed :(")
+        finally:
+            disconnect(conn)
+
 
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
@@ -1466,6 +1953,10 @@ api.add_resource(getImageForPlayers, "/api/v2/getImageForPlayers/<string:game_co
 api.add_resource(endGame, "/api/v2/endGame/<string:game_code>")
 api.add_resource(getUniqueImageInRound, "/api/v2/getUniqueImageInRound/<string:game_code>,<string:round_number>")
 api.add_resource(uploadImage, "/api/v2/uploadImage")
+api.add_resource(goaway, "/api/v2/goaway")
+api.add_resource(SendEmail, "/api/v2/sendEmail")
+api.add_resource(CheckEmailValidated, "/api/v2/checkEmailValidated")
+api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
 
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
