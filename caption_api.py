@@ -101,9 +101,9 @@ CORS(app)
 # app.config["MAIL_USERNAME"] = os.environ.get("EMAIL")
 # app.config["MAIL_PASSWORD"] = os.environ.get("PASSWORD")
 
-app.config["MAIL_USERNAME"] = os.environ.get("SUPPORT_EMAIL")
-app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
-
+#This should be on Github
+# app.config["MAIL_USERNAME"] = os.environ.get("SUPPORT_EMAIL")
+# app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
 
 # Setting for mydomain.com
 app.config["MAIL_SERVER"] = "smtp.mydomain.com"
@@ -1442,12 +1442,33 @@ class uploadImage(Resource):
             print("image_response: ", image_response)
 
 
-            add_to_deck_query = '''
+            get_image_uids_query = '''
                             SELECT deck_image_uids
-                            FROM captions.deck                    
+                            FROM captions.deck    
+                            WHERE deck_title =\'''' + deck_name + '''\'                
                             '''
-            deck_response = execute(add_to_deck_query, "post", conn)
+            deck_response = execute(get_image_uids_query, "get", conn)
             print("deck_response: ", deck_response)
+
+            uid_string = deck_response["result"][0]["deck_image_uids"]
+            print("The following is the uid string", uid_string)
+
+            if(uid_string == "()"): #is this how we check for string deep equality in python?
+                uid_string = "(\"" + new_image_uid + "\")"
+            else:
+                uid_string = uid_string[:-1] + ", \"" + new_image_uid + "\")"
+
+            print("The following is the new uid string", uid_string)
+
+
+
+            add_to_image_uids_query = '''
+                                            UPDATE captions.deck
+                                            SET deck_image_uids = \'''' + uid_string + '''\' 
+                                            WHERE deck_title =\'''' + deck_name + '''\' 
+                                            '''
+            update_deck_response = execute(add_to_image_uids_query, "post", conn)
+            print("update_deck_response: ", update_deck_response)
 
             if image_response["code"] == 281:
                 response["message"] = "281, image successfully added to the database."
