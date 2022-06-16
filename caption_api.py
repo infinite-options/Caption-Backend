@@ -358,6 +358,14 @@ def get_new_imageUID(conn):
         return newImageQuery['result'][0]['new_id']
     return "Could not generate new image UID", 500
 
+def get_new_deckUID(conn):
+    # print("getting new image")
+    newImageQuery = execute("CALL captions.new_deck_uid()", 'get', conn)
+    # print(newImageQuery)
+    if newImageQuery['code'] == 280:
+        return newImageQuery['result'][0]['new_id']
+    return "Could not generate new deck UID", 500
+
 # --Caption Queries start here -------------------------------------------------------------------------------
 
 
@@ -714,10 +722,35 @@ class decks(Resource):
         response = {}
         try:
             conn = connect()
-            get_all_decks_query = '''
-                                SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description FROM captions.deck
+
+            data = request.get_json(force=True)
+            print("Received: ", data)
+
+            user_uid = data["user_uid"] #public => "" or personal => "xxx-xxxxxx"
+
+
+            # get_all_decks_query = '''
+            #                     SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description FROM captions.deck
+            #                     '''
+
+            get_all_decks_query1 = '''
+                                SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description 
+                                FROM captions.deck
+                                WHERE deck_user_uid =\'''' + user_uid + '''\'
                                 '''
-            decks = execute(get_all_decks_query, "get", conn)
+
+            get_all_decks_query2 = '''
+                                SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description 
+                                FROM captions.deck
+                                WHERE 
+                                    deck_user_uid =\'''' + user_uid + '''\' OR
+                                    deck_user_uid = \'''' + "PUBLIC" + '''\'
+                                '''
+
+            if(user_uid == ""):
+                decks = execute(get_all_decks_query2, "get", conn)
+            else:
+                decks = execute(get_all_decks_query1, "get", conn)
             print("players info: ", decks)
             if decks["code"] == 280:
                 response["message"] = "280, get available decks request successful."
@@ -737,6 +770,27 @@ class decks(Resource):
             data = request.get_json(force=True)
             # print to Received data to Terminal
             print("Received:", data)
+
+            deck_uid = execute(get_new_deckUID(), "get", conn)
+            deck_title = data["deck_title"]
+            deck_user_uid = data["user_uid"]
+
+            insert_deck_query = '''
+                                INSERT INTO captions.deck
+                                SET
+                                WHERE 
+                                    deck_uid = \'''' + deck_uid + '''\' OR
+                                    deck_title = \'''' + deck_title + '''\' OR
+                                    deck_user_uid = \'''' + deck_user_uid + '''\' OR
+                                '''
+
+            insertResponse = execute(insert_deck_query, "post", conn)
+            print("insert response ", insertResponse)
+
+            if insertResponse["code"] == 280:
+                response["message"] = "280, User custom deck has been successfully uploaded"
+                response["insert info"] = insertResponse["result"]
+                return response, 200
         except:
             raise BadRequest("Create deck Request failed")
         finally:
