@@ -96,14 +96,14 @@ stripe.api_key = stripe_secret_test_key
 CORS(app)
 
 # --------------- Mail Variables ------------------
-# "SUPPORT_EMAIL": "",
-# "SUPPORT_PASSWORD": "",
-# app.config["MAIL_USERNAME"] = os.environ.get("EMAIL")
-# app.config["MAIL_PASSWORD"] = os.environ.get("PASSWORD")
-
 #This should be on Github
-# app.config["MAIL_USERNAME"] = os.environ.get("SUPPORT_EMAIL")
-# app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
+app.config["MAIL_USERNAME"] = os.environ.get("SUPPORT_EMAIL")
+app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
+
+#This should not be on Github -- should work on localhost
+# app.config['MAIL_USERNAME'] = "..."
+# app.config['MAIL_PASSWORD'] = "..."
+
 
 # Setting for mydomain.com
 app.config["MAIL_SERVER"] = "smtp.mydomain.com"
@@ -771,17 +771,17 @@ class decks(Resource):
             # print to Received data to Terminal
             print("Received:", data)
 
-            deck_uid = execute(get_new_deckUID(), "get", conn)
+            deck_uid = get_new_deckUID(conn)
+            #deck_uid = execute(get_new_deckUID(), "get", conn)
             deck_title = data["deck_title"]
             deck_user_uid = data["user_uid"]
 
             insert_deck_query = '''
                                 INSERT INTO captions.deck
-                                SET
-                                WHERE 
-                                    deck_uid = \'''' + deck_uid + '''\' OR
-                                    deck_title = \'''' + deck_title + '''\' OR
-                                    deck_user_uid = \'''' + deck_user_uid + '''\' OR
+                                SET 
+                                    deck_uid = \'''' + deck_uid + '''\',
+                                    deck_title = \'''' + deck_title + '''\',
+                                    deck_user_uid = \'''' + deck_user_uid + '''\';
                                 '''
 
             insertResponse = execute(insert_deck_query, "post", conn)
