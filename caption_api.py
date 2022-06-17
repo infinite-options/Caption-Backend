@@ -96,7 +96,7 @@ stripe.api_key = stripe_secret_test_key
 CORS(app)
 
 # --------------- Mail Variables ------------------
-#This should be on Github
+#This should be on Github -- should work wth environmental variables
 app.config["MAIL_USERNAME"] = os.environ.get("SUPPORT_EMAIL")
 app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
 
@@ -1563,7 +1563,11 @@ class CheckEmailValidated(Resource):
 
             if len(validation["result"]) == 0:
                 print("List is empty --> Please create a new user")
-                response[message] = "User does not exist. Please create an account with this email."
+
+                #Roshan caught a bug. :)
+                #response[message] = "User does not exist. Please create an account with this email."
+                response["message"] = "User does not exist. Please create an account with this email."
+
                 return response, 200
             else:
                 print("first element of list", validation["result"][0])
@@ -1865,7 +1869,7 @@ class SendEmail(Resource):
                 # recipients=["pmarathay@gmail.com", "mayukh.das@sjsu.edu"]
 
                 # hello17 ()
-                recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", email]
+                recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", "roshan.nadavi@gmail.com", email]
             )
             print("past message")
             # msg = Message("Test email", sender='support@mealsfor.me', recipients=["pmarathay@gmail.com"])
