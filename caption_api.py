@@ -973,6 +973,7 @@ class getUniqueImageInRound(Resource):
                 image_url = execute(get_image_url_query, "get", conn)
                 print("image_url: ", image_url)
                 if image_url["code"] == 280:
+                    #update round image query
                     write_to_round_query = '''
                                         UPDATE captions.round
                                         SET round_image_uid=\'''' + image_uid + '''\'
@@ -1012,6 +1013,7 @@ class getImageInRound(Resource):
                 response["message1"] = "280, get image request successful."
                 response["image_url"] = image_info["result"][0]["image_url"]
                 image_uid = image_info["result"][0]["image_uid"]
+                #another update round_image query
                 write_to_round_query = '''
                                     UPDATE captions.round
                                     SET round_image_uid=\'''' + image_uid + '''\'
@@ -1038,6 +1040,12 @@ class getImageForPlayers(Resource):
         items = {}
         try:
             conn = connect()
+
+
+
+
+
+
             get_image_query = '''
                             SELECT DISTINCT captions.image.image_url, captions.round.round_image_uid
                             FROM captions.image
@@ -2003,6 +2011,51 @@ class goaway(Resource):
             disconnect(conn)
 
 
+#Wow! This is my first customized endpoint. More than happy that it actually works :).
+class testHarvard(Resource):
+    def get(self):
+        print("beginning testHarvard")
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            print("connection established")
+
+            num = randint(1,376513)
+            page = num/10 + 1
+            index = num%10
+
+            # page = randint(1,3751)
+            # print(page)
+            # index = randint(1,10)
+            # print(index)
+
+            # harvardURL = "https://api.harvardartmuseums.org/image"
+            # print(harvardURL)
+            # params = {
+            #     "apikey": "332993bc-6aca-4a69-bc9d-ae6cca29f633",
+            #     "page": "37650"
+            #     #"page": str(page),
+            # }
+            # print("Params = ", params)
+            # r = requests.get(url = harvardURL, data=params)
+            # print(r.json())
+
+            harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page="
+            harvardURL = harvardURL + str(page)
+            #print(harvardURL)
+            r = requests.get(harvardURL)
+            #print(r.json()["records"][index]["baseimageurl"])
+
+
+            response["message"] = "testHarvard complete"
+            response["result"] = r.json()["records"][index]["baseimageurl"]
+            return response, 200
+        except:
+            raise BadRequest("Harvard Request Failed :(")
+        finally:
+            disconnect(conn)
+
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
 
@@ -2036,6 +2089,7 @@ api.add_resource(goaway, "/api/v2/goaway")
 api.add_resource(SendEmail, "/api/v2/sendEmail")
 api.add_resource(CheckEmailValidated, "/api/v2/checkEmailValidated")
 api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
+api.add_resource(testHarvard, "/api/v2/testHarvard")
 
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
