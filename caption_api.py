@@ -718,39 +718,45 @@ class getPlayers(Resource):
 
 
 class decks(Resource):
-    def get(self):
+    def get(self, user_uid, public_decks):
+        print(user_uid)
+        print(public_decks)
         response = {}
         try:
             conn = connect()
 
-            data = request.get_json(force=True)
-            print("Received: ", data)
+            # data = request.get_json(force=True)
+            # print("Received: ", data)
+            #
+            #user_uid = data["user_uid"] #public => "" or personal => "xxx-xxxxxx"
 
-            user_uid = data["user_uid"] #public => "" or personal => "xxx-xxxxxx"
+            #we need to know user_uid
+                #if it matches or anything that is public (user_uid is provided, match it with that or
 
 
-            # get_all_decks_query = '''
-            #                     SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description FROM captions.deck
-            #                     '''
+            get_all_decks_query = '''
+                                SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description FROM captions.deck
+                                '''
 
             get_all_decks_query1 = '''
-                                SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description 
+                                SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description
                                 FROM captions.deck
                                 WHERE deck_user_uid =\'''' + user_uid + '''\'
                                 '''
 
             get_all_decks_query2 = '''
-                                SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description 
+                                SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description
                                 FROM captions.deck
-                                WHERE 
+                                WHERE
                                     deck_user_uid =\'''' + user_uid + '''\' OR
                                     deck_user_uid = \'''' + "PUBLIC" + '''\'
                                 '''
 
-            if(user_uid == ""):
-                decks = execute(get_all_decks_query2, "get", conn)
-            else:
+            if(public_decks == "false"):
                 decks = execute(get_all_decks_query1, "get", conn)
+            else:
+                decks = execute(get_all_decks_query2, "get", conn)
+            #decks = execute(get_all_decks_query2, "get", conn)
             print("players info: ", decks)
             if decks["code"] == 280:
                 response["message"] = "280, get available decks request successful."
@@ -761,6 +767,9 @@ class decks(Resource):
             raise BadRequest("get available decks request failed")
         finally:
             disconnect(conn)
+
+
+
 
     def post(self):
         response = {}
@@ -933,6 +942,154 @@ class getUniqueImageInRound(Resource):
         items = {}
         try:
             conn = connect()
+
+            check_deck_harvard_query = '''
+                                SELECT deck_title
+                                FROM captions.deck
+                                WHERE deck_uid = 
+                                    (SELECT DISTINCT round_deck_uid FROM captions.round WHERE round_game_uid = (
+                                        SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))'''
+            deck_is_harvard = execute(check_deck_harvard_query, "get", conn)
+
+            # #Version 2 --> post the baseimageurl into the database
+            # if (deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
+            #     get_images_query = '''
+            #                                             SELECT distinct captions.round.round_image_uid
+            #                                             FROM captions.round
+            #                                             INNER Join captions.deck
+            #                                             ON captions.round.round_deck_uid=captions.deck.deck_uid
+            #                                             WHERE round_game_uid =  (SELECT game_uid FROM captions.game
+            #                                             WHERE game_code=\'''' + game_code + '''\')
+            #                                             '''
+            #     image_info = execute(get_images_query, "get", conn)
+            #     print("harvard image info: ", image_info)
+            #
+            #     images_used = set()
+            #     for result in image_info["result"]:
+            #         if result["round_image_uid"] not in images_used:
+            #             images_used.add(result["round_image_uid"])
+            #     print(images_used, type(images_used))
+            #     flag = True
+            #     # image_uid = ""
+            #     while flag:
+            #         image_uid = randint(1, 376513)
+            #         page = image_uid // 10 + 1
+            #         index = image_uid % 10
+            #
+            #         harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page=" + str(
+            #             page)
+            #         print(harvardURL, "(page,index) = (", page, ",", index,")")
+            #         r = requests.get(harvardURL)
+            #         image_url = r.json()["records"][index]["baseimageurl"]
+            #         print("curr index: ", image_uid)
+            #         if image_url not in images_used:
+            #             flag = False
+            #
+            #     print("next_image_index: ", image_uid, type(image_uid))
+            #     print("next_image_url: ", image_url, type(image_url))
+            #     # page = index/10 + 1
+            #     # index = index%10
+            #     # page = image_uid // 10 + 1
+            #     # index = image_uid % 10
+            #     #
+            #     # harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page=" + str(
+            #     #     page)
+            #     # print(harvardURL)
+            #     # r = requests.get(harvardURL)
+            #     # print(index)
+            #     # print("before return for getUniqueImage ", r.json()["records"][index]["baseimageurl"])
+            #
+            #     # image_uid = index
+            #     image_uid = str(image_uid)
+            #     # write_to_round_query = '''
+            #     #                                         UPDATE captions.round
+            #     #                                         SET round_image_uid=\'''' + image_uid + '''\'
+            #     #                                         WHERE round_game_uid=(SELECT game_uid FROM captions.game
+            #     #                                         WHERE game_code=\'''' + game_code + '''\')
+            #     #                                         AND round_number = \'''' + round_number + '''\'
+            #     #                                         '''
+            #     write_to_round_query = '''
+            #                                                         UPDATE captions.round
+            #                                                         SET round_image_uid=\'''' + "("+ image_url +")"+ '''\'
+            #                                                         WHERE round_game_uid=(SELECT game_uid FROM captions.game
+            #                                                         WHERE game_code=\'''' + game_code + '''\')
+            #                                                         AND round_number = \'''' + round_number + '''\'
+            #                                                         '''
+            #     updated_round = execute(write_to_round_query, "post", conn)
+            #     print("game_attr_update info: ", updated_round)
+            #
+            #     if updated_round["code"] == 281:
+            #         response["message"] = "281, image in the Round updated."
+            #         #print("Return url for getUniqueImageInRound ", r.json()["records"][index]["baseimageurl"])
+            #         response["image_url"] = r.json()["records"][index]["baseimageurl"]
+            #         response["image_uid"] = image_uid
+            #         return response, 200
+
+            if(deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
+                get_images_query = '''
+                                            SELECT distinct captions.round.round_image_uid
+                                            FROM captions.round
+                                            INNER Join captions.deck
+                                            ON captions.round.round_deck_uid=captions.deck.deck_uid
+                                            WHERE round_game_uid =  (SELECT game_uid FROM captions.game
+                                            WHERE game_code=\'''' + game_code + '''\')
+                                            '''
+                image_info = execute(get_images_query, "get", conn)
+                print("harvard image info: ", image_info)
+
+                images_used = set()
+                for result in image_info["result"]:
+                    if result["round_image_uid"] not in images_used:
+                        images_used.add(result["round_image_uid"])
+                print(images_used, type(images_used))
+                flag = True
+                image_id = ""
+                while flag:
+                    image_uid = randint(1,376513)
+                    page = image_uid // 10 + 1
+                    index = image_uid % 10
+
+                    harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page=" + str(
+                        page)
+                    print(harvardURL)
+                    r = requests.get(harvardURL)
+                    print(index)
+                    # print("before return for getUniqueImage ", r.json()["records"][index]["baseimageurl"])
+
+                    # image_uid = index
+                    image_uid = r.json()["records"][index]["imageid"]
+                    image_id = str(image_uid)
+                    print("curr index: ", image_uid)
+                    if image_uid not in images_used:
+                        flag = False
+
+                print("next_image_id: ", image_id, type(image_id))
+
+                write_to_round_query = '''
+                                                        UPDATE captions.round
+                                                        SET round_image_uid=\'''' + image_id + '''\'
+                                                        WHERE round_game_uid=(SELECT game_uid FROM captions.game
+                                                        WHERE game_code=\'''' + game_code + '''\')
+                                                        AND round_number = \'''' + round_number + '''\'
+                                                        '''
+                updated_round = execute(write_to_round_query, "post", conn)
+                print("game_attr_update info: ", updated_round)
+
+                if updated_round["code"] == 281:
+                    response["message"] = "281, image in the Round updated."
+                    #print("Return url for getUniqueImageInRound ", r.json()["records"][index]["baseimageurl"])
+                    response["image_url"] = r.json()["records"][index]["baseimageurl"]
+                    response["image_uid"] = image_uid
+                    return response, 200
+
+               # return //the end
+
+
+        #maintain a set of already used integers and choose integers as we need
+            # if it is already
+
+            #Below is the code for the non-harvard api decks(do not touch)  >:(
+            ################################################################################
             get_images_query = '''
                             SELECT distinct(captions.deck.deck_image_uids), captions.round.round_image_uid
                             FROM captions.round
@@ -1041,21 +1198,114 @@ class getImageForPlayers(Resource):
         try:
             conn = connect()
 
+            #####  HARVARD ART MUSEUM IF CLAUSE #####
+            check_deck_harvard_query = '''
+                                SELECT deck_title
+                                FROM captions.deck
+                                WHERE deck_uid = 
+                                    (SELECT DISTINCT round_deck_uid FROM captions.round WHERE round_game_uid = (
+                                        SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))'''
+            deck_is_harvard = execute(check_deck_harvard_query, "get", conn)
+
+            # #Version 2 --> get the baseimageurl rom the database
+            # if (deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
+            #     # get_image_query = '''
+            #     #                 SELECT DISTINCT captions.round.round_image_uid
+            #     #                 FROM captions.image
+            #     #                 INNER JOIN captions.round
+            #     #                 ON captions.image.image_uid = captions.round.round_image_uid
+            #     #                 WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
+            #     #                 AND round_number=(SELECT MAX(round_number)
+            #     #                                 FROM captions.round
+            #     #                                 WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\'))
+            #     #                 '''
+            #     get_image_query = '''
+            #                                    SELECT DISTINCT captions.round.round_image_uid
+            #                                    FROM captions.round
+            #                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\')
+            #                                    AND round_number = (SELECT MAX(round_number)
+            #                                                        FROM captions.round
+            #                                                        WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))
+            #                                    '''
+            #
+            #     image_info = execute(get_image_query, "get", conn)
+            #     # image_uid = int(image_info["result"][0]["round_image_uid"])
+            #     # print(image_uid, type(image_uid))
+            #     # page = image_uid // 10 + 1
+            #     # index = image_uid % 10
+            #     #
+            #     # harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page=" + str(
+            #     #     page)
+            #     # print(harvardURL)
+            #     # print(index)
+            #     # r = requests.get(harvardURL)
+            #     # print("before return getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
+            #     #
+            #     # print("image info: ", image_info)
+            #     if image_info["code"] == 280:
+            #         response["message"] = "280, get image for players other than host request successful."
+            #         #response["image_uid="] = image_info["result"][0]["round_image_uid"]
+            #         # response["image_url"] = image_info["result"][0]["image_url"]
+            #         #print("Return url for getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
+            #         response["image_url"] = image_info["result"][0]["round_image_uid"]
+            #         return response, 200
+
+            if(deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
+                # get_image_query = '''
+                #                 SELECT DISTINCT captions.round.round_image_uid
+                #                 FROM captions.image
+                #                 INNER JOIN captions.round
+                #                 ON captions.image.image_uid = captions.round.round_image_uid
+                #                 WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
+                #                 AND round_number=(SELECT MAX(round_number)
+                #                                 FROM captions.round
+                #                                 WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\'))
+                #                 '''
+                get_image_query = '''
+                                    SELECT DISTINCT captions.round.round_image_uid
+                                    FROM captions.round
+                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\')
+                                    AND round_number = (SELECT MAX(round_number)
+                                                        FROM captions.round
+                                                        WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))
+                                    '''
+
+                image_info = execute(get_image_query, "get", conn)
+                image_uid = image_info["result"][0]["round_image_uid"]
+                print(image_uid, type(image_uid))
+                # page = image_uid//10 + 1
+                # index = image_uid%10
+
+                harvardURL = "https://api.harvardartmuseums.org/image/"+ image_uid +"?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633"
+                #harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page="
+                print(harvardURL)
+                #print(index)
+                r = requests.get(harvardURL)
+                #print("before return getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
 
 
+                print("image info: ", image_info)
+                if image_info["code"] == 280:
+                    response["message"] = "280, get image for players other than host request successful."
+                    response["image_id"] = image_uid
+                    #response["image_uid"] = image_info["result"][0]["round_image_uid"]
+                    #response["image_url"] = image_info["result"][0]["image_url"]
+                    #print("Return url for getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
+                    #response["image_url"] = r.json()["records"][index]["baseimageurl"]
+                    response["image_url"] = r.json()["baseimageurl"]
+                    return response, 200
 
-
+            ####  Non-HARVARD #####
 
             get_image_query = '''
                             SELECT DISTINCT captions.image.image_url, captions.round.round_image_uid
                             FROM captions.image
                             INNER JOIN captions.round
                             ON captions.image.image_uid = captions.round.round_image_uid
-                            WHERE round_game_uid = (SELECT game_uid FROM captions.game
-                            WHERE game_code=\'''' + game_code + '''\')
-                            AND round_number=(SELECT MAX(round_number) FROM captions.round 
-                                            WHERE round_game_uid = (SELECT game_uid FROM captions.game
-                                            WHERE game_code=\'''' + game_code + '''\'))             
+                            WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
+                            AND round_number=(SELECT MAX(round_number) 
+                                            FROM captions.round 
+                                            WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\'))             
                             '''
             image_info = execute(get_image_query, "get", conn)
 
@@ -1818,8 +2068,7 @@ class CheckEmailValidationCode(Resource):
             disconnect(conn)
 
         # ENDPOINT AND JSON OBJECT THAT WORKS
-        # http://localhost:4000/api/v2/createappointment
-
+        # http://localhost:4000/api/v2/createappointmen
 
 # SEND EMAIL
 class SendEmail(Resource):
@@ -1992,7 +2241,6 @@ class SendEmail(Resource):
         finally:
             disconnect(conn)
 
-
 #Wow! This is my first customized endpoint. More than happy that it actually works :).
 class goaway(Resource):
     def get(self):
@@ -2010,8 +2258,6 @@ class goaway(Resource):
         finally:
             disconnect(conn)
 
-
-#Wow! This is my first customized endpoint. More than happy that it actually works :).
 class testHarvard(Resource):
     def get(self):
         print("beginning testHarvard")
@@ -2066,7 +2312,8 @@ api.add_resource(createUser, "/api/v2/createUser")
 api.add_resource(createNewGame, "/api/v2/createNewGame")
 api.add_resource(joinGame, "/api/v2/joinGame")
 api.add_resource(getPlayers, "/api/v2/getPlayers/<string:game_code>")
-api.add_resource(decks, "/api/v2/decks")
+#api.add_resource(decks, "/api/v2/decks")
+api.add_resource(decks, "/api/v2/decks/<string:user_uid>,<string:public_decks>")
 api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>,<string:round_number>")
 api.add_resource(selectDeck, "/api/v2/selectDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
