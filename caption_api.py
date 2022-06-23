@@ -456,6 +456,11 @@ class createUser(Resource):
             user_zip = data["user_zip"]
             # print(data)
 
+            # Create Validation Code 
+            message = "Email Verification Code Sent"
+            code = randint(100,999)
+            print("Email validation code will be set to: ", code)
+
 
 
             # check if the user is already present
@@ -464,6 +469,8 @@ class createUser(Resource):
             #                     AND user_zip_code =\'''' + user_zip + '''\'
             #                     '''
 
+
+            # Check if user exists
             check_query = '''SELECT user_uid, email_validated FROM captions.user 
                                 WHERE user_email= \'''' + user_email + '''\' 
                                 AND user_zip_code =\'''' + user_zip + '''\'
@@ -472,14 +479,35 @@ class createUser(Resource):
             user = execute(check_query, "get", conn)
             print(user)
             new_user_uid = ""
+
+
             if len(user["result"]) > 0:
                 # if user is already present
                 new_user_uid = user["result"][0]["user_uid"]
                 print("Found User ID")
                 print(new_user_uid)
-                return user["result"][0], 200
-            else:
 
+                # If user is NOT Validated then send code
+                if user["result"][0]["email_validated"] == "FALSE":
+
+                    # Set Code In Database
+                    set_code_query = '''
+                                    UPDATE captions.user
+                                    SET email_validated = \'''' + str(code) + '''\' 
+                                    WHERE user_uid =\'''' + new_user_uid + '''\'
+                                    '''
+                    #print("valid modified example query\n", set_code_query)
+                    updateQueryResult = execute(set_code_query, "post", conn)
+                    print("Result of update query: ", updateQueryResult["message"])
+
+
+                    # Send Code to User
+                    SendEmail.get(self, user_name, user_email, code, message)
+
+                return user["result"][0], 200
+            
+            else:
+                # New user
                 new_user_uid = get_new_userUID(conn)
                 print(new_user_uid)
                 print(getNow())
@@ -492,6 +520,7 @@ class createUser(Resource):
                         user_alias = \'''' + user_alias + '''\', 
                         user_email = \'''' + user_email + '''\', 
                         user_zip_code = \'''' + user_zip + '''\',
+                        email_validated = \'''' + str(code) + '''\',
                         user_purchases = NULL
                     '''
 
@@ -499,8 +528,13 @@ class createUser(Resource):
                 print("items: ", items)
                 if items["code"] == 281:
                     response["message"] = "Create User successful"
-                    response["email_validated"] = "FALSE"
-                    return response, 200
+                    response["user_uid"] = new_user_uid
+                    response["email_validated"] = code
+
+                    # Send Code to User
+                    SendEmail.get(self, user_name, user_email, str(code), message)
+
+                return response, 200
         except:
             raise BadRequest("Create User Request failed")
         finally:
@@ -2186,9 +2220,12 @@ class SendEmail(Resource):
             # )
             print("past body")
             print(msg.body)
-            mail.send(msg)
-            print("after mail.send(msg)")
-            print(msg)
+            try: 
+                mail.send(msg)
+                print("after mail.send(msg)")
+                print(msg)
+            except:
+                print("Likely an EMail Credential Issue")
 
             # # print("first email sent")
             # # Send email to Host
