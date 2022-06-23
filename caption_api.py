@@ -499,6 +499,7 @@ class createUser(Resource):
                 print("items: ", items)
                 if items["code"] == 281:
                     response["message"] = "Create User successful"
+                    response["email_validated"] = "FALSE"
                     return response, 200
         except:
             raise BadRequest("Create User Request failed")
