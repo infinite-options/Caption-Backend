@@ -451,31 +451,55 @@ class createUser(Resource):
             print("Received:", data)
 
             user_name = data["user_name"]
-            user_alias = data["user_alias"]
+            user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
             user_email = data["user_email"]
             user_zip = data["user_zip"]
             # print(data)
 
-            new_user_uid = get_new_userUID(conn)
-            print(new_user_uid)
-            print(getNow())
 
-            query = '''
-                INSERT INTO captions.user
-                SET user_uid = \'''' + new_user_uid + '''\',
-                    user_created_at = \'''' + getNow() + '''\',
-                    user_name = \'''' + user_name + '''\', 
-                    user_alias = \'''' + user_alias + '''\', 
-                    user_email = \'''' + user_email + '''\', 
-                    user_zip_code = \'''' + user_zip + '''\',
-                    user_purchases = NULL
-                '''
 
-            items = execute(query, "post", conn)
-            print("items: ", items)
-            if items["code"] == 281:
-                response["message"] = "Create User successful"
-                return response, 200
+            # check if the user is already present
+            # check_query = '''SELECT user_uid FROM captions.user 
+            #                     WHERE user_email= \'''' + user_email + '''\' 
+            #                     AND user_zip_code =\'''' + user_zip + '''\'
+            #                     '''
+
+            check_query = '''SELECT user_uid, email_validated FROM captions.user 
+                                WHERE user_email= \'''' + user_email + '''\' 
+                                AND user_zip_code =\'''' + user_zip + '''\'
+                                '''
+
+            user = execute(check_query, "get", conn)
+            print(user)
+            new_user_uid = ""
+            if len(user["result"]) > 0:
+                # if user is already present
+                new_user_uid = user["result"][0]["user_uid"]
+                print("Found User ID")
+                print(new_user_uid)
+                return user["result"][0], 200
+            else:
+
+                new_user_uid = get_new_userUID(conn)
+                print(new_user_uid)
+                print(getNow())
+
+                query = '''
+                    INSERT INTO captions.user
+                    SET user_uid = \'''' + new_user_uid + '''\',
+                        user_created_at = \'''' + getNow() + '''\',
+                        user_name = \'''' + user_name + '''\', 
+                        user_alias = \'''' + user_alias + '''\', 
+                        user_email = \'''' + user_email + '''\', 
+                        user_zip_code = \'''' + user_zip + '''\',
+                        user_purchases = NULL
+                    '''
+
+                items = execute(query, "post", conn)
+                print("items: ", items)
+                if items["code"] == 281:
+                    response["message"] = "Create User successful"
+                    return response, 200
         except:
             raise BadRequest("Create User Request failed")
         finally:
