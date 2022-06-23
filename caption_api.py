@@ -2083,46 +2083,59 @@ class CheckEmailValidationCode(Resource):
         try:
             conn = connect()
             data = request.get_json(force=True)
-            print("Received:", data)
+            print("Received JSON data: ", data)
 
-
-            email = data["email"]
+            user_uid = data["user_uid"]
             code = data["code"]
-
-            print("email", email)
-            print("code", code)
+            print("user uid = ", user_uid, ", code = ", code)
 
             get_verification_code_query = '''
-                            SELECT email_validated FROM captions.user WHERE user_email=\'''' + email + '''\'
+                            SELECT email_validated FROM captions.user WHERE user_uid=\'''' + user_uid + '''\'
                             '''
 
             validation = execute(get_verification_code_query, "get", conn)
             print("validation info: ", validation)
 
+            #If for some reason we can't find a user in the table with the given user_uid....
             if len(validation["result"]) == 0:
-                print("List is empty --> Please create a new user")
-                response["message"] = "User does not exist. Please create an account with this email."
+                response["message"] = "No user has been found for the following user_uid. " \
+                                      "Perhaps you have entered an invalid user_uid, " \
+                                      "or the endpoint to createNewUsers is broken"
                 return response, 200
-            else:
-                print("first element of list", validation["result"][0])
 
-            if validation["result"][0]["email_validated"] == code:
+            #If we do find such a user,
+            # we will cross-examine the code they have typed in against what we have stored in the database.
+            #If it matches --> hooray! We set the email_validated of that user to true.
+            #If it DOES NOT match --> whoops! They typed in a bad code.
+            print("first element of list", validation["result"][0])
+            if validation["result"][0]["email_validated"] == "TRUE":
+                response["message"] = "User Email for this specific user has already been verified." \
+                                      " No need for a code! :)"
+                response["email_validated_status"] = "TRUE"
+
+            elif validation["result"][0]["email_validated"] == "FALSE":
+                response["message"] = "You need to generate a code for this user before you verify it."
+                response["email_validated_status"] = "FALSE"
+
+            elif validation["result"][0]["email_validated"] == code:
                 set_code_query = '''
                                 UPDATE captions.user
                                 SET email_validated =\'''' + "TRUE" + '''\'
-                                WHERE user_email=\'''' + email + '''\'
+                                WHERE user_uid=\'''' + user_uid + '''\'
                                 '''
                 verification = execute(set_code_query, "post", conn)
                 print("User code has been updated to TRUE")
-                response["message"] = "Email has been verified"
+                response["message"] = "User Email Verification Code has been validated. Have fun!"
+                response["email_validated_status"] = "TRUE"
+
             else:
-                response["message"] = "Invalid Verification Code"
-                # return response, 200
-                # disconnect(conn)
+                response["message"] = "Invalid Verification Code." \
+                                      "The code provided does not match what we have in the database"
+                response["email_validated_status"] = "..."
 
             return response, 200
         except:
-            raise BadRequest("Create Appt Request failed, please try again later.")
+            raise BadRequest("Validate Email Verification Code Request Failed. Try again later. :(")
         finally:
             disconnect(conn)
 
