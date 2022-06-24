@@ -666,7 +666,8 @@ class joinGame(Resource):
                                     '''
             game_info = execute(check_game_code_query, "get", conn)
             print(game_info)
-            if game_info["code"] == 280:
+            if game_info["code"] == 280 and len(game_info["result"]) == 1:
+                #We need to check if we got anything back or not
                 game_uid = game_info["result"][0]["game_uid"]
                 # game_created_at = game_info["result"][0]["game_created_at"]
                 # game_code = game_info["result"][0]["game_code"]
@@ -742,6 +743,7 @@ class joinGame(Resource):
                                 return response, 200
             else:
                 response["warning"] = "Invalid game code."
+                return response
 
 
         except:
