@@ -458,7 +458,7 @@ class createUser(Resource):
 
             # Create Validation Code 
             message = "Email Verification Code Sent"
-            code = randint(100,999)
+            code = str(randint(100,999))
             print("Email validation code will be set to: ", code)
 
 
@@ -493,7 +493,7 @@ class createUser(Resource):
                     # Set Code In Database
                     set_code_query = '''
                                     UPDATE captions.user
-                                    SET email_validated = \'''' + str(code) + '''\' 
+                                    SET email_validated = \'''' + code + '''\' 
                                     WHERE user_uid =\'''' + new_user_uid + '''\'
                                     '''
                     #print("valid modified example query\n", set_code_query)
@@ -520,7 +520,7 @@ class createUser(Resource):
                         user_alias = \'''' + user_alias + '''\', 
                         user_email = \'''' + user_email + '''\', 
                         user_zip_code = \'''' + user_zip + '''\',
-                        email_validated = \'''' + str(code) + '''\',
+                        email_validated = \'''' + code + '''\',
                         user_purchases = NULL
                     '''
 
@@ -529,13 +529,13 @@ class createUser(Resource):
                 if items["code"] == 281:
                     response["message"] = "Create User successful"
                     response["user_uid"] = new_user_uid
-                    response["email_validated"] = str(code)
+                    response["email_validated"] = code
 
                     # Send Code to User
-                    SendEmail.get(self, user_name, user_email, str(code), message)
+                    SendEmail.get(self, user_name, user_email, code, message)
 
                 return response, 200
-                
+
         except:
             raise BadRequest("Create User Request failed")
         finally:
