@@ -1,4 +1,4 @@
-    # To run program:  python3 io_api.py
+# To run program:  python3 io_api.py
 
 # README:  if conn error make sure password is set properly in RDS PASSWORD section
 
@@ -529,12 +529,13 @@ class createUser(Resource):
                 if items["code"] == 281:
                     response["message"] = "Create User successful"
                     response["user_uid"] = new_user_uid
-                    response["email_validated"] = code
+                    response["email_validated"] = str(code)
 
                     # Send Code to User
                     SendEmail.get(self, user_name, user_email, str(code), message)
 
                 return response, 200
+                
         except:
             raise BadRequest("Create User Request failed")
         finally:
