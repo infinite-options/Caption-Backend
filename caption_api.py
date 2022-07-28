@@ -2200,7 +2200,8 @@ class SendEmail(Resource):
                 # recipients=["pmarathay@gmail.com", "mayukh.das@sjsu.edu"]
 
                 # hello17 ()
-                recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", "roshan.nadavi@gmail.com", email]
+                # recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", "roshan.nadavi@gmail.com", email]
+                recipients = ["pmarathay@gmail.com", email]
             )
             print("past message")
             # msg = Message("Test email", sender='support@mealsfor.me', recipients=["pmarathay@gmail.com"])
