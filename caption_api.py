@@ -2190,7 +2190,7 @@ class SendEmail(Resource):
                 #             "pmarathay@gmail.com"],
 
                 #hello10 (does work)
-                # recipients=[email,"pmarathay@gmail.com"]
+                recipients=[email,"pmarathay@gmail.com"]
 
                 # hello11 & hello15 (does work also??)
                 # recipients = [email, "pmarathay@gmail.com"],
@@ -2202,7 +2202,7 @@ class SendEmail(Resource):
 
                 # hello17 ()
                 # recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", "roshan.nadavi@gmail.com", email]
-                recipients = ["pmarathay@gmail.com", email]
+                
             )
             print("past message")
             # msg = Message("Test email", sender='support@mealsfor.me', recipients=["pmarathay@gmail.com"])
