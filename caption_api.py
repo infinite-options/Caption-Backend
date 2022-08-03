@@ -765,7 +765,7 @@ class getPlayers(Resource):
                                 INNER JOIN captions.round 
                                 ON user.user_uid = round.round_user_uid
                                 WHERE round_game_uid= (SELECT game_uid FROM captions.game
-                                WHERE game_code=\'''' + game_code + '''\')
+                                WHERE game_code=\'''' + game_code + '''\') AND user.email_validated = "TRUE"
                                 '''
             players = execute(get_players_query, "get", conn)
             print("players info: ", players)
@@ -1486,10 +1486,17 @@ class voteCaption(Resource):
             # print to Received data to Terminal
             print("Received:", data)
             caption = data["caption"]
+            print("caption info: ", caption)
             round_number = data["round_number"]
             game_code = data["game_code"]
 
-            submit_caption_query = '''
+            # Add caption check here
+            if caption == None:
+                response["message"] = "No Vote Cast."
+                return response, 200
+
+            else:
+                submit_caption_query = '''
                                 UPDATE captions.round
                                 SET votes = votes + 1 
                                 WHERE round_game_uid=(SELECT game_uid FROM captions.game 
@@ -1497,13 +1504,13 @@ class voteCaption(Resource):
                                 AND round_number=\'''' + round_number + '''\'
                                 AND caption=\'''' + caption + '''\'                                  
                                 '''
-            caption = execute(submit_caption_query, "post", conn)
-            print("caption info: ", caption)
-            if caption["code"] == 281:
-                response["message"] = "281, Caption for the user updated."
-                return response, 200
+                caption = execute(submit_caption_query, "post", conn)
+                print("caption info: ", caption)
+                if caption["code"] == 281:
+                    response["message"] = "281, Vote Recorded."
+                    return response, 200
         except:
-            raise BadRequest("submit caption Request failed")
+            raise BadRequest("Voting failed")
         finally:
             disconnect(conn)
 
@@ -2190,7 +2197,7 @@ class SendEmail(Resource):
                 #             "pmarathay@gmail.com"],
 
                 #hello10 (does work)
-                recipients=[email,"pmarathay@gmail.com"]
+                # recipients=[email,"pmarathay@gmail.com"]
 
                 # hello11 & hello15 (does work also??)
                 # recipients = [email, "pmarathay@gmail.com"],
@@ -2201,7 +2208,7 @@ class SendEmail(Resource):
                 # recipients=["pmarathay@gmail.com", "mayukh.das@sjsu.edu"]
 
                 # hello17 ()
-                # recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", "roshan.nadavi@gmail.com", email]
+                recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", "roshan.nadavi@gmail.com", email]
                 
             )
             print("past message")
