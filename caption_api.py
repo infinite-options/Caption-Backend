@@ -103,6 +103,8 @@ app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
 #This should not be on Github -- should work on localhost
 # app.config['MAIL_USERNAME'] = "..."
 # app.config['MAIL_PASSWORD'] = "..."
+app.config['MAIL_USERNAME'] = "support@mealsfor..."
+app.config['MAIL_PASSWORD'] = "Support..."
 
 
 # Setting for mydomain.com
@@ -2203,12 +2205,15 @@ class SendEmail(Resource):
                 # recipients = [email, "pmarathay@gmail.com"],
 
                 # recipients=["mayukh.das@sjsu.edu"]
+                # recipients=["pmarathay@gmail.com"]
 
                 # hello16 (works)
                 # recipients=["pmarathay@gmail.com", "mayukh.das@sjsu.edu"]
 
                 # hello17 ()
-                recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", "roshan.nadavi@gmail.com", email]
+                # recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", "roshan.nadavi@gmail.com", email]
+
+                recipients = ["pmarathay@gmail.com", email]
                 
             )
             print("past message")
