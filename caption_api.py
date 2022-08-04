@@ -101,10 +101,8 @@ app.config["MAIL_USERNAME"] = os.environ.get("SUPPORT_EMAIL")
 app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
 
 #This should not be on Github -- should work on localhost
-# app.config['MAIL_USERNAME'] = "..."
-# app.config['MAIL_PASSWORD'] = "..."
-app.config['MAIL_USERNAME'] = "support@mealsfor..."
-app.config['MAIL_PASSWORD'] = "Support..."
+# app.config['MAIL_USERNAME'] = "support@mealsfor..."
+# app.config['MAIL_PASSWORD'] = "Support..."
 
 
 # Setting for mydomain.com
