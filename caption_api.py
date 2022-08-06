@@ -1489,11 +1489,27 @@ class voteCaption(Resource):
             print("caption info: ", caption)
             round_number = data["round_number"]
             game_code = data["game_code"]
+            # bring in User ID
+            user_id = data["user_id"]
 
             # Add caption check here
             if caption == None:
                 response["message"] = "No Vote Cast."
-                return response, 200
+
+                # Need to add NoVotes quote
+                submit_novote_query = '''
+                                UPDATE captions.round
+                                SET novotes = 1 
+                                WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                WHERE game_code=\'''' + game_code + '''\')
+                                AND round_number=\'''' + round_number + '''\'
+                                AND round_user_uid=\'''' + user_id + '''\'                                  
+                                '''
+                novote = execute(submit_novote_query, "post", conn)
+                print("no vote info: ", novote)
+                if novote["code"] == 281:
+                    response["message"] = "281, No Vote Recorded."
+                    return response, 200
 
             else:
                 submit_caption_query = '''
@@ -1524,7 +1540,7 @@ class getPlayersWhoHaventVoted(Resource):
         try:
             conn = connect()
             get_players_count_query = '''
-                            SELECT COUNT(votes)-SUM(votes) FROM captions.round
+                            SELECT COUNT(votes)-SUM(votes)-SUM(novotes) AS notvoted FROM captions.round
                             INNER JOIN captions.user
                             ON captions.round.round_user_uid=captions.user.user_uid
                             WHERE round_game_uid = (SELECT game_uid FROM captions.game
@@ -1534,9 +1550,11 @@ class getPlayersWhoHaventVoted(Resource):
             players_count = execute(get_players_count_query, "get", conn)
 
             print("players info: ", players_count)
+            print("players info code: ", players_count["code"])
             if players_count["code"] == 280:
+
                 response["message1"] = "280, get players who haven't submitted votes request successful."
-                response["players_count"] = players_count["result"][0]["COUNT(votes)-SUM(votes)"]
+                response["players_count"] = players_count["result"][0]["notvoted"]
                 return response, 200
         except:
             raise BadRequest("Get players who haven't submitted votes request failed")
@@ -1682,6 +1700,7 @@ class createNextRound(Resource):
             round_number = data["round_number"]
             game_code = data["game_code"]
             new_round_number = str(int(round_number) + 1)
+            print("Next Round Number:", new_round_number)
 
             players_query = '''
                                 SELECT round_user_uid, round_deck_uid FROM captions.round
