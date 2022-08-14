@@ -641,7 +641,7 @@ class addUser(Resource):
                         user_name = \'''' + user_name + '''\', 
                         user_alias = \'''' + user_alias + '''\', 
                         user_email = \'''' + user_email + '''\', 
-                        user_zip_code = \'''' + user_zip + '''\',
+                        user_zip_code = json_array(\'''' + user_zip + '''\'),
                         email_validated = \'''' + code + '''\',
                         user_purchases = NULL
                     '''
