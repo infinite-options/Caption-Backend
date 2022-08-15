@@ -566,14 +566,15 @@ class addUser(Resource):
             if user['result'] != ():
             # if len(user['result'][0]['user_uid']) > 0:
                 response["user_uid"] = user['result'][0]['user_uid']
+                response["user_code"] = user["result"][0]["email_validated"]
 
                 # CHECK IF VALIDATION CODE IS TRUE
                 if user['result'][0]["email_validated"] != "TRUE":
                     print("Not Validated")
                     response["user_status"] = "User NOT Validated"
-                    response["user_code"] = user["result"][0]["email_validated"]
                     SendEmail.get(self, user_name, user_email, user["result"][0]["email_validated"], message)
                     # return response
+            
 
                 # CHECK IF ZIP CODE IS IN LIST
                 if user_zip not in user['result'][0]['user_zip_code']:
