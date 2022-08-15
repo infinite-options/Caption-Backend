@@ -370,167 +370,167 @@ def get_new_deckUID(conn):
 
 
 # CHECK IF USER EXISTS
-def checkUser(self, user_name, user_alias, user_email, user_zip):
-    print("In checkUser")
-    response = {}
-    try:
-        conn = connect()
-        # print Received data to Terminal
-        print("In checkUser:", user_name, user_alias, user_email, user_zip)
+# def checkUser(self, user_name, user_alias, user_email, user_zip):
+#     print("In checkUser")
+#     response = {}
+#     try:
+#         conn = connect()
+#         # print Received data to Terminal
+#         print("In checkUser:", user_name, user_alias, user_email, user_zip)
 
        
-        message = "Email Verification Code Sent"
+#         message = "Email Verification Code Sent"
 
 
-        # CHECK IF EMAIL EXISTS IN DB
-        check_email = '''
-                SELECT * FROM captions.user
-                WHERE user_email= \'''' + user_email + '''\'
-                '''
+#         # CHECK IF EMAIL EXISTS IN DB
+#         check_email = '''
+#                 SELECT * FROM captions.user
+#                 WHERE user_email= \'''' + user_email + '''\'
+#                 '''
 
-        userinfo = execute(check_email, "get", conn)
-        print(userinfo, type(userinfo))
-        print("User Info returned: ", userinfo['result'])
-
-
-        # CHECK IF USER EXISTS
-        if userinfo['result'] != ():
-        # if len(userinfo['result'][0]['user_uid']) > 0:
-            response["user_uid"] = userinfo['result'][0]['user_uid']
-
-            # CHECK IF VALIDATION CODE IS TRUE
-            if userinfo['result'][0]["email_validated"] != "TRUE":
-                print("Not Validated")
-                response["user_status"] = "User NOT Validated"
-                response["user_code"] = userinfo["result"][0]["email_validated"]
-                SendEmail.get(self, user_name, user_email, userinfo["result"][0]["email_validated"], message)
-                # return response
-
-            # CHECK IF ZIP CODE IS IN LIST
-            if user_zip not in userinfo['result'][0]['user_zip_code']:
-                print("Zip code not in list")
-                response["user_zip"] = "Zip code not in list"
+#         userinfo = execute(check_email, "get", conn)
+#         print(userinfo, type(userinfo))
+#         print("User Info returned: ", userinfo['result'])
 
 
-                query = '''
-                    UPDATE captions.user
-                    SET user_zip_code = JSON_ARRAY_APPEND(user_zip_code, '$', \'''' + user_zip + '''\')
-                    WHERE user_email = \'''' + user_email + '''\';
-                    '''
+#         # CHECK IF USER EXISTS
+#         if userinfo['result'] != ():
+#         # if len(userinfo['result'][0]['user_uid']) > 0:
+#             response["user_uid"] = userinfo['result'][0]['user_uid']
 
-                addzip = execute(query, "post", conn)
-                print("items: ", addzip)
-                if addzip["code"] == 281:
-                    response["user_zip_added"] = "Zip code added"
+#             # CHECK IF VALIDATION CODE IS TRUE
+#             if userinfo['result'][0]["email_validated"] != "TRUE":
+#                 print("Not Validated")
+#                 response["user_status"] = "User NOT Validated"
+#                 response["user_code"] = userinfo["result"][0]["email_validated"]
+#                 SendEmail.get(self, user_name, user_email, userinfo["result"][0]["email_validated"], message)
+#                 # return response
 
-            # CHECK IF ALIAS HAS CHANGED
-            if user_alias != userinfo['result'][0]['user_alias']:
-                print("Alias changed")
-                response["user_alias"] = "Alias changed"
-
-                query = '''
-                    UPDATE captions.user
-                    SET user_alias = \'''' + user_alias + '''\'
-                    WHERE user_email = \'''' + user_email + '''\';
-                    '''
-
-                update_alias = execute(query, "post", conn)
-                print("items: ", update_alias)
-                if update_alias["code"] == 281:
-                    response["user_alias_added"] = "Alias updated"
-
-            # CHECK IF USER NAME HAS CHANGED
-            if user_name != userinfo['result'][0]['user_name']:
-                print("Name changed")
-                response["user_name"] = "Name Changed"
-
-                query = '''
-                    UPDATE captions.user
-                    SET user_name = \'''' + user_name + '''\'
-                    WHERE user_email = \'''' + user_email + '''\';
-                    '''
-
-                update_name = execute(query, "post", conn)
-                print("items: ", update_name)
-                if update_name["code"] == 281:
-                    response["user_name_updated"] = "Name updated"
+#             # CHECK IF ZIP CODE IS IN LIST
+#             if user_zip not in userinfo['result'][0]['user_zip_code']:
+#                 print("Zip code not in list")
+#                 response["user_zip"] = "Zip code not in list"
 
 
-        # USER DOES NOT EXIST
-        else:
-            # Create Validation Code FOR NEW USER
-            code = str(randint(100,999))
-            print("Email validation code will be set to: ", code)
+#                 query = '''
+#                     UPDATE captions.user
+#                     SET user_zip_code = JSON_ARRAY_APPEND(user_zip_code, '$', \'''' + user_zip + '''\')
+#                     WHERE user_email = \'''' + user_email + '''\';
+#                     '''
 
-            new_user_uid = get_new_userUID(conn)
-            print(new_user_uid)
-            print(getNow())
+#                 addzip = execute(query, "post", conn)
+#                 print("items: ", addzip)
+#                 if addzip["code"] == 281:
+#                     response["user_zip_added"] = "Zip code added"
 
-            query = '''
-                INSERT INTO captions.user
-                SET user_uid = \'''' + new_user_uid + '''\',
-                    user_created_at = \'''' + getNow() + '''\',
-                    user_name = \'''' + user_name + '''\', 
-                    user_alias = \'''' + user_alias + '''\', 
-                    user_email = \'''' + user_email + '''\', 
-                    user_zip_code = \'''' + user_zip + '''\',
-                    email_validated = \'''' + code + '''\',
-                    user_purchases = NULL
-                '''
+#             # CHECK IF ALIAS HAS CHANGED
+#             if user_alias != userinfo['result'][0]['user_alias']:
+#                 print("Alias changed")
+#                 response["user_alias"] = "Alias changed"
 
-            items = execute(query, "post", conn)
-            print("items: ", items)
-            if items["code"] == 281:
-                response["message"] = "Create User successful"
-                response["user_uid"] = new_user_uid
-                response["email_validated"] = code
+#                 query = '''
+#                     UPDATE captions.user
+#                     SET user_alias = \'''' + user_alias + '''\'
+#                     WHERE user_email = \'''' + user_email + '''\';
+#                     '''
 
-                # Send Code to User
-                SendEmail.get(self, user_name, user_email, code, message)
+#                 update_alias = execute(query, "post", conn)
+#                 print("items: ", update_alias)
+#                 if update_alias["code"] == 281:
+#                     response["user_alias_added"] = "Alias updated"
 
-            print(response)
-            return response, 200
+#             # CHECK IF USER NAME HAS CHANGED
+#             if user_name != userinfo['result'][0]['user_name']:
+#                 print("Name changed")
+#                 response["user_name"] = "Name Changed"
 
+#                 query = '''
+#                     UPDATE captions.user
+#                     SET user_name = \'''' + user_name + '''\'
+#                     WHERE user_email = \'''' + user_email + '''\';
+#                     '''
 
-
-        print(response)
-        return response, 200
-
-
-    except:
-        raise BadRequest("Create User Request failed")
-    finally:
-        disconnect(conn)
+#                 update_name = execute(query, "post", conn)
+#                 print("items: ", update_name)
+#                 if update_name["code"] == 281:
+#                     response["user_name_updated"] = "Name updated"
 
 
-class createUser(Resource):
-    def post(self):
-        response = {}
-        items = {}
-        try:
-            conn = connect()
-            data = request.get_json(force=True)
-            # print to Received data to Terminal
-            print("Received:", data)
+#         # USER DOES NOT EXIST
+#         else:
+#             # Create Validation Code FOR NEW USER
+#             code = str(randint(100,999))
+#             print("Email validation code will be set to: ", code)
+
+#             new_user_uid = get_new_userUID(conn)
+#             print(new_user_uid)
+#             print(getNow())
+
+#             query = '''
+#                 INSERT INTO captions.user
+#                 SET user_uid = \'''' + new_user_uid + '''\',
+#                     user_created_at = \'''' + getNow() + '''\',
+#                     user_name = \'''' + user_name + '''\', 
+#                     user_alias = \'''' + user_alias + '''\', 
+#                     user_email = \'''' + user_email + '''\', 
+#                     user_zip_code = \'''' + user_zip + '''\',
+#                     email_validated = \'''' + code + '''\',
+#                     user_purchases = NULL
+#                 '''
+
+#             items = execute(query, "post", conn)
+#             print("items: ", items)
+#             if items["code"] == 281:
+#                 response["message"] = "Create User successful"
+#                 response["user_uid"] = new_user_uid
+#                 response["email_validated"] = code
+
+#                 # Send Code to User
+#                 SendEmail.get(self, user_name, user_email, code, message)
+
+#             print(response)
+#             return response, 200
 
 
-            user_name = data["user_name"]
-            user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
-            user_email = data["user_email"]
-            user_zip = data["user_zip"]
-            # print(user_zip)
+
+#         print(response)
+#         return response, 200
 
 
-            response = checkUser(self, user_name, user_alias, user_email, user_zip)
-            # print("after CheckEmail call")
+#     except:
+#         raise BadRequest("Create User Request failed")
+#     finally:
+#         disconnect(conn)
 
-            return response, 200
+
+# class createUser(Resource):
+#     def post(self):
+#         response = {}
+#         items = {}
+#         try:
+#             conn = connect()
+#             data = request.get_json(force=True)
+#             # print to Received data to Terminal
+#             print("Received:", data)
 
 
-        except:
-            raise BadRequest("Create User Request failed")
-        finally:
-            disconnect(conn)
+#             user_name = data["user_name"]
+#             user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
+#             user_email = data["user_email"]
+#             user_zip = data["user_zip"]
+#             # print(user_zip)
+
+
+#             response = checkUser(self, user_name, user_alias, user_email, user_zip)
+#             # print("after CheckEmail call")
+
+#             return response, 200
+
+
+#         except:
+#             raise BadRequest("Create User Request failed")
+#         finally:
+#             disconnect(conn)
 
 class addUser(Resource):
     def post(self):
@@ -670,250 +670,6 @@ class addUser(Resource):
         finally:
             disconnect(conn)
 
-# ORIGINAL createUser
-# class createUser(Resource):
-#     def post(self):
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-#             data = request.get_json(force=True)
-#             # print to Received data to Terminal
-#             print("Received:", data)
-
-#             user_name = data["user_name"]
-#             user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
-#             user_email = data["user_email"]
-#             user_zip = data["user_zip"]
-#             # print(data)
-#             message = "Email Verification Code Sent"
-
-#             # Use statements below if we want to use def
-#             # user = CheckEmail(user_email)
-#             # print("after CheckEmail call")
-
-#             # CHECK IF EMAIL EXISTS IN DB
-#             check_user = '''SELECT * FROM captions.user
-#                             WHERE user_email= \'''' + user_email + '''\'
-#                             '''
-
-#             user = execute(check_user, "get", conn)
-#             print(user)
-#             print(user['result'][0]['user_uid'])
-#             print(user['result'][0]['user_zip_code'])
-
-
-#             # CHECK IF USER EXISTS
-#             if len(user['result'][0]['user_uid']) > 0:
-#                 response["user_uid"] = user['result'][0]['user_uid']
-
-#                 # CHECK IF VALIDATION CODE IS TRUE
-#                 if user['result'][0]["email_validated"] != "TRUE":
-#                     print("Not Validated")
-#                     response["user_status"] = "User NOT Validated"
-#                     response["user_code"] = user["result"][0]["email_validated"]
-#                     SendEmail.get(self, user_name, user_email, user["result"][0]["email_validated"], message)
-#                     # return response
-
-#                 # CHECK IF ZIP CODE IS IN LIST
-#                 if user_zip not in user['result'][0]['user_zip_code']:
-#                     print("Zip code not in list")
-#                     response["user_zip"] = "Zip code not in list"
-
-
-#                     query = '''
-#                         UPDATE captions.user
-#                         SET user_zip_code = JSON_ARRAY_APPEND(user_zip_code, '$', \'''' + user_zip + '''\')
-#                         WHERE user_email = \'''' + user_email + '''\';
-#                         '''
-
-#                     addzip = execute(query, "post", conn)
-#                     print("items: ", addzip)
-#                     if addzip["code"] == 281:
-#                         response["user_zip"] = "Zip code added"
-
-#                 # CHECK IF ALIAS HAS CHANGED
-#                 if user_alias != user['result'][0]['user_alias']:
-#                     print("Alias changed")
-#                     response["user_alias"] = "Alias changed"
-
-#                     query = '''
-#                         UPDATE captions.user
-#                         SET user_alias = \'''' + user_alias + '''\'
-#                         WHERE user_email = \'''' + user_email + '''\';
-#                         '''
-
-#                     update_alias = execute(query, "post", conn)
-#                     print("items: ", update_alias)
-#                     if update_alias["code"] == 281:
-#                         response["user_alias"] = "Alias updated"
-
-#                 # CHECK IF USER NAME HAS CHANGED
-#                 if user_name != user['result'][0]['user_name']:
-#                     print("Name changed")
-#                     response["user_name"] = "Name Changed"
-
-#                     query = '''
-#                         UPDATE captions.user
-#                         SET user_name = \'''' + user_name + '''\'
-#                         WHERE user_email = \'''' + user_email + '''\';
-#                         '''
-
-#                     update_name = execute(query, "post", conn)
-#                     print("items: ", update_name)
-#                     if update_name["code"] == 281:
-#                         response["user_name"] = "Name updated"
-
-#             # USER DOES NOT EXIST
-#             else:
-#                 # Create Validation Code FOR NEW USER
-#                 code = str(randint(100,999))
-#                 print("Email validation code will be set to: ", code)
-
-#                 new_user_uid = get_new_userUID(conn)
-#                 print(new_user_uid)
-#                 print(getNow())
-
-#                 query = '''
-#                     INSERT INTO captions.user
-#                     SET user_uid = \'''' + new_user_uid + '''\',
-#                         user_created_at = \'''' + getNow() + '''\',
-#                         user_name = \'''' + user_name + '''\', 
-#                         user_alias = \'''' + user_alias + '''\', 
-#                         user_email = \'''' + user_email + '''\', 
-#                         user_zip_code = \'''' + user_zip + '''\',
-#                         email_validated = \'''' + code + '''\',
-#                         user_purchases = NULL
-#                     '''
-
-#                 items = execute(query, "post", conn)
-#                 print("items: ", items)
-#                 if items["code"] == 281:
-#                     response["message"] = "Create User successful"
-#                     response["user_uid"] = new_user_uid
-#                     response["email_validated"] = code
-
-#                     # Send Code to User
-#                     SendEmail.get(self, user_name, user_email, code, message)
-
-#                 return response, 200
-
-
-
-
-#             return response, 200
-
-
-#         except:
-#             raise BadRequest("Create User Request failed")
-#         finally:
-#             disconnect(conn)
-
-
-
-# class createUserOLD(Resource):
-#     def post(self):
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-#             data = request.get_json(force=True)
-#             # print to Received data to Terminal
-#             print("Received:", data)
-
-#             user_name = data["user_name"]
-#             user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
-#             user_email = data["user_email"]
-#             user_zip = data["user_zip"]
-#             # print(data)
-
-
-#             # Create Validation Code 
-#             message = "Email Verification Code Sent"
-#             code = str(randint(100,999))
-#             print("Email validation code will be set to: ", code)
-
-
-
-#             # check if the user is already present
-#             # check_query = '''SELECT user_uid FROM captions.user 
-#             #                     WHERE user_email= \'''' + user_email + '''\' 
-#             #                     AND user_zip_code =\'''' + user_zip + '''\'
-#             #                     '''
-
-
-#             # Check if user exists
-#             check_query = '''SELECT user_uid, email_validated FROM captions.user 
-#                                 WHERE user_email= \'''' + user_email + '''\' 
-#                                 AND user_zip_code =\'''' + user_zip + '''\'
-#                                 '''
-
-#             user = execute(check_query, "get", conn)
-#             print(user)
-#             new_user_uid = ""
-
-
-#             if len(user["result"]) > 0:
-#                 # if user is already present
-#                 new_user_uid = user["result"][0]["user_uid"]
-#                 print("Found User ID")
-#                 print(new_user_uid)
-
-#                 # If user is NOT Validated then send code
-#                 if user["result"][0]["email_validated"] == "FALSE":
-
-#                     # Set Code In Database
-#                     set_code_query = '''
-#                                     UPDATE captions.user
-#                                     SET email_validated = \'''' + code + '''\' 
-#                                     WHERE user_uid =\'''' + new_user_uid + '''\'
-#                                     '''
-#                     #print("valid modified example query\n", set_code_query)
-#                     updateQueryResult = execute(set_code_query, "post", conn)
-#                     print("Result of update query: ", updateQueryResult["message"])
-
-
-#                     # Send Code to User
-#                     SendEmail.get(self, user_name, user_email, code, message)
-
-#                 return user["result"][0], 200
-            
-#             else:
-#                 # New user
-#                 new_user_uid = get_new_userUID(conn)
-#                 print(new_user_uid)
-#                 print(getNow())
-
-#                 query = '''
-#                     INSERT INTO captions.user
-#                     SET user_uid = \'''' + new_user_uid + '''\',
-#                         user_created_at = \'''' + getNow() + '''\',
-#                         user_name = \'''' + user_name + '''\', 
-#                         user_alias = \'''' + user_alias + '''\', 
-#                         user_email = \'''' + user_email + '''\', 
-#                         user_zip_code = \'''' + user_zip + '''\',
-#                         email_validated = \'''' + code + '''\',
-#                         user_purchases = NULL
-#                     '''
-
-#                 items = execute(query, "post", conn)
-#                 print("items: ", items)
-#                 if items["code"] == 281:
-#                     response["message"] = "Create User successful"
-#                     response["user_uid"] = new_user_uid
-#                     response["email_validated"] = code
-
-#                     # Send Code to User
-#                     SendEmail.get(self, user_name, user_email, code, message)
-
-#                 return response, 200
-
-#         except:
-#             raise BadRequest("Create User Request failed")
-#         finally:
-#             disconnect(conn)
-
-
 
 
 class createGame(Resource):
@@ -961,256 +717,6 @@ class createGame(Resource):
             raise BadRequest("Create Game Request failed")
         finally:
             disconnect(conn)
-
-
-
-
-
-
-
-
-
-# class createNewGame(Resource):
-#     def post(self):
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-#             data = request.get_json(force=True)
-#             # print to Received data to Terminal
-#             print("Received:", data)
-
-#             # User/Host data
-#             user_uid = data["user_uid"]
-#             # user_alias = data["user_alias"]
-#             # user_name = data["user_name"]
-#             # user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
-#             # user_email = data["user_email"]
-#             # user_zip = data["user_zip"]
-#             # print(data)
-
-#             # Game data
-#             new_game_uid = get_new_gameUID(conn)
-#             # print(new_game_uid)
-#             num_rounds = "5"  # Default number of rounds
-#             time_limit = "00:00:30"  # Default time-limit
-#             game_code = random.randint(10000000, 99999999)
-#             scoring_scheme = "R"
-#             print(game_code)
-
-
-#             create_game_query = '''
-#                 INSERT INTO captions.game
-#                 SET game_uid = \'''' + new_game_uid + '''\',
-#                     game_created_at = \'''' + getNow() + '''\',
-#                     game_code = \'''' + str(game_code) + '''\',
-#                     num_rounds = \'''' + num_rounds + '''\',
-#                     time_limit = \'''' + time_limit + '''\',
-#                     game_host_uid = \'''' + user_uid + '''\',
-#                     scoring_scheme = \'''' + scoring_scheme + '''\'
-#                     '''
-#             game_items = execute(create_game_query, "post", conn)
-#             print("game_items: ", game_items)
-#             if game_items["code"] == 281:
-#                 response["game_message"] = "Create New Game successful"
-#                 new_round_uid = get_new_roundUID(conn)
-#                 add_user_to_round_query = '''
-#                                         INSERT INTO captions.round
-#                                         SET round_uid = \'''' + new_round_uid + '''\',
-#                                         round_game_uid = \'''' + new_game_uid + '''\',
-#                                         round_user_uid = \'''' + user_uid + '''\',
-#                                         round_number = 1,
-#                                         round_deck_uid = NULL,
-#                                         round_image_uid = NULL ,
-#                                         caption = NULL,
-#                                         votes = 0,
-#                                         score = 0, 
-#                                         round_started_at = NULL'''
-#                 add_user = execute(add_user_to_round_query, "post", conn)
-#                 print("add_user_response: ", add_user)
-#                 if add_user["code"] == 281:
-#                     response["round_message"] = "Host added to the game."
-#                     response["game_code"] = str(game_code)
-#                     response["host_id"] = user_uid
-#                     response["host_alias"] = user_alias
-#                     return response, 200
-
-#         except:
-#             raise BadRequest("Create New Game Request failed")
-#         finally:
-#             disconnect(conn)
-
-
-
-
-
-
-# class createNewGame(Resource):
-#     def post(self):
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-#             data = request.get_json(force=True)
-#             # print to Received data to Terminal
-#             print("Received:", data)
-
-#             # User/Host data
-#             user_name = data["user_name"]
-#             user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
-#             user_email = data["user_email"]
-#             user_zip = data["user_zip"]
-#             # print(data)
-
-#             # Game data
-#             new_game_uid = get_new_gameUID(conn)
-#             # print(new_game_uid)
-#             num_rounds = "6"  # Default number of rounds
-#             time_limit = "00:00:30"  # Default time-limit
-#             game_code = random.randint(10000000, 99999999)
-#             scoring_scheme = "R"
-#             print(game_code)
-
-#             # check if the user is already present
-#             check_query = '''SELECT user_uid FROM captions.user 
-#                                 WHERE user_email= \'''' + user_email + '''\' 
-#                                 AND user_zip_code =\'''' + user_zip + '''\'
-#                                 '''
-#             user = execute(check_query, "get", conn)
-#             print(user)
-#             new_user_uid = ""
-#             if len(user["result"]) > 0:
-#                 # if user is already present
-#                 new_user_uid = user["result"][0]["user_uid"]
-#                 print(new_user_uid)
-#             else:
-#                 new_user_uid = get_new_userUID(conn)
-#                 # print(new_user_uid)
-#                 # print(getNow())
-#                 query = '''
-#                     INSERT INTO captions.user
-#                     SET user_uid = \'''' + new_user_uid + '''\',
-#                         user_created_at = \'''' + getNow() + '''\',
-#                         user_name = \'''' + user_name + '''\', 
-#                         user_alias = \'''' + user_alias + '''\', 
-#                         user_email = \'''' + user_email + '''\', 
-#                         user_zip_code = \'''' + user_zip + '''\',
-#                         user_purchases = NULL
-#                     '''
-
-#                 items = execute(query, "post", conn)
-#                 print("items: ", items)
-
-#             if user["code"] == 280 or items["code"] == 281:
-#                 create_game_query = '''
-#                 INSERT INTO captions.game
-#                 SET game_uid = \'''' + new_game_uid + '''\',
-#                     game_created_at = \'''' + getNow() + '''\',
-#                     game_code = \'''' + str(game_code) + '''\',
-#                     num_rounds = \'''' + num_rounds + '''\',
-#                     time_limit = \'''' + time_limit + '''\',
-#                     game_host_uid = \'''' + new_user_uid + '''\',
-#                     scoring_scheme = \'''' + scoring_scheme + '''\'
-#                     '''
-#                 game_items = execute(create_game_query, "post", conn)
-#                 print("game_items: ", game_items)
-#                 if game_items["code"] == 281:
-#                     response["game_message"] = "Create New Game successful"
-#                     new_round_uid = get_new_roundUID(conn)
-#                     add_user_to_round_query = '''
-#                                             INSERT INTO captions.round
-#                                             SET round_uid = \'''' + new_round_uid + '''\',
-#                                             round_game_uid = \'''' + new_game_uid + '''\',
-#                                             round_user_uid = \'''' + new_user_uid + '''\',
-#                                             round_number = 1,
-#                                             round_deck_uid = NULL,
-#                                             round_image_uid = NULL ,
-#                                             caption = NULL,
-#                                             votes = 0,
-#                                             score = 0, 
-#                                             round_started_at = NULL'''
-#                     add_user = execute(add_user_to_round_query, "post", conn)
-#                     print("add_user_response: ", add_user)
-#                     if add_user["code"] == 281:
-#                         response["round_message"] = "Host added to the game."
-#                         response["game_code"] = str(game_code)
-#                         response["host_id"] = new_user_uid
-#                         response["host_alias"] = user_alias
-#                         return response, 200
-
-#         except:
-#             raise BadRequest("Create New Game Request failed")
-#         finally:
-#             disconnect(conn)
-
-
-class selectDeck(Resource):
-    def post(self):
-        response = {}
-        items = {}
-        try:
-            conn = connect()
-            data = request.get_json(force=True)
-            # print to Received data to Terminal
-            print("Received:", data)
-            deck_uid = data["deck_uid"]
-            game_code = data["game_code"]
-
-            select_deck_query = '''
-                                UPDATE captions.game
-                                SET game_deck = \'''' + deck_uid + '''\'
-                                WHERE game_code = \'''' + game_code + '''\';
-                                '''
-
-            selected_deck = execute(select_deck_query, "post", conn)
-            print("selected deck info: ", selected_deck)
-
-            if selected_deck["code"] == 281:
-                response["message"] = "281, Deck successfully submitted."
-                return response, 200
-
-        except:
-            raise BadRequest("Select deck Request failed")
-        finally:
-            disconnect(conn)
-
-
-class assignDeck(Resource):
-    def post(self):
-        response = {}
-        items = {}
-        try:
-            conn = connect()
-            data = request.get_json(force=True)
-            # print to Received data to Terminal
-            print("Received:", data)
-            deck_uid = data["deck_uid"]
-            game_code = data["game_code"]
-
-            assign_deck_query = '''
-
-
-                                UPDATE captions.round
-                                SET round_deck_uid = \'''' + deck_uid + '''\'
-                                WHERE round_game_uid = (
-                                    SELECT game_uid
-                                    FROM captions.game
-                                    WHERE game_code = \'''' + game_code + '''\');
-                                '''
-
-            assign_deck = execute(assign_deck_query, "post", conn)
-            print("selected deck info: ", assign_deck)
-
-            if assign_deck["code"] == 281:
-                response["message"] = "281, Deck assigned successfully."
-                return response, 200
-
-        except:
-            raise BadRequest("Assign deck Request failed")
-        finally:
-            disconnect(conn)
-
-
 
 
 
@@ -1294,124 +800,8 @@ class joinGame(Resource):
             disconnect(conn)
 
 
-# class joinGame(Resource):
-#     def post(self):
-#         response = {}
-#         returning_user = {}
-#         new_user = {}
-#         game_info = {}
-#         try:
-#             conn = connect()
-#             data = request.get_json(force=True)
-#             # print to Received data to Terminal
-#             print("Received:", data)
 
-#             # player data
-#             user_name = data["user_name"]
-#             user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
-#             user_email = data["user_email"]
-#             user_zip = data["user_zip"]
-#             game_code = data["game_code"]
-
-#             # get the game_uid from the game code
-#             check_game_code_query = '''
-#                                     SELECT * FROM captions.game
-#                                     WHERE game_code=\'''' + game_code + '''\'
-#                                     '''
-#             game_info = execute(check_game_code_query, "get", conn)
-#             print(game_info)
-#             if game_info["code"] == 280 and len(game_info["result"]) == 1:
-#                 #We need to check if we got anything back or not
-#                 game_uid = game_info["result"][0]["game_uid"]
-#                 # game_created_at = game_info["result"][0]["game_created_at"]
-#                 # game_code = game_info["result"][0]["game_code"]
-#                 # num_rounds = game_info["result"][0]["num_rounds"]
-#                 # time_limit = game_info["result"][0]["time_limit"]
-#                 # game_host_uid = game_info["result"][0]["game_host_uid"]
-
-#                 # check if the user is returning or new
-#                 check_user_query = '''SELECT user_uid FROM captions.user 
-#                                 WHERE user_email= \'''' + user_email + '''\' 
-#                                 AND user_zip_code =\'''' + user_zip + '''\'
-#                                 '''
-#                 returning_user = execute(check_user_query, "get", conn)
-#                 print("returning user: ", returning_user)
-#                 user_uid = ""
-#                 if len(returning_user["result"]) > 0:
-#                     # if user is already present
-#                     user_uid = returning_user["result"][0]["user_uid"]
-#                     print("returning user id:", user_uid)
-#                 else:
-#                     user_uid = get_new_userUID(conn)
-#                     # print(new_user_uid)
-#                     # print(getNow())
-#                     add_new_user_query = '''
-#                                             INSERT INTO captions.user
-#                                             SET user_uid = \'''' + user_uid + '''\',
-#                                             user_created_at = \'''' + getNow() + '''\',
-#                                             user_name = \'''' + user_name + '''\', 
-#                                             user_alias = \'''' + user_alias + '''\', 
-#                                             user_email = \'''' + user_email + '''\', 
-#                                             user_zip_code = \'''' + user_zip + '''\',
-#                                             user_purchases = NULL
-#                                         '''
-
-#                     new_user = execute(add_new_user_query, "post", conn)
-#                     print("new user info: ", new_user)
-#                 if returning_user["code"] == 280 or new_user["code"] == 281:
-#                     # add the user to round from the game id
-#                     check_user_in_game_query = '''
-#                                                 SELECT round_user_uid FROM captions.round
-#                                                 WHERE round_game_uid = \'''' + game_uid + '''\'
-#                                                 AND round_user_uid = \'''' + user_uid + '''\'
-#                                                 '''
-#                     existing_player = execute(check_user_in_game_query, "get", conn)
-#                     print("player_info: ", existing_player)
-                    
-#                     if existing_player["code"] == 280:
-#                         if len(existing_player["result"]) > 0:
-#                             response["message"] = "280, Player has already joined the game."
-#                             response["user_uid"] = user_uid
-#                             return response, 200
-#                         else:
-#                             new_round_uid = get_new_roundUID(conn)
-#                             add_user_to_round_query = '''
-#                                                     INSERT INTO captions.round
-#                                                     SET round_uid = \'''' + new_round_uid + '''\',
-#                                                     round_game_uid = \'''' + game_uid + '''\',
-#                                                     round_user_uid = \'''' + user_uid + '''\',
-#                                                     round_number = 1,
-#                                                     round_deck_uid = NULL,
-#                                                     round_image_uid = NULL ,
-#                                                     caption = NULL,
-#                                                     votes = 0,
-#                                                     score = 0,
-#                                                     round_started_at = NULL'''
-#                             add_user = execute(add_user_to_round_query, "post", conn)
-#                             print("add_user_response: ", add_user)
-#                             if add_user["code"] == 281:
-#                                 response["message"] = "Player added to the game."
-#                                 response["game_uid"] = game_uid
-#                                 response["user_uid"] = user_uid
-#                                 response["user_alias"] = user_alias
-#                                 return response, 200
-#             else:
-#                 response["warning"] = "Invalid game code."
-#                 return response
-
-
-#         except:
-#             raise BadRequest("Join Game Request failed")
-#         finally:
-#             disconnect(conn)
-
-
-
-
-
-
-
-class createRound(Resource):
+class selectDeck(Resource):
     def post(self):
         response = {}
         items = {}
@@ -1420,40 +810,110 @@ class createRound(Resource):
             data = request.get_json(force=True)
             # print to Received data to Terminal
             print("Received:", data)
+            deck_uid = data["deck_uid"]
+            game_code = data["game_code"]
 
-            game_uid = data["game_uid"]
-            # user_uid = data["user_uid"]
-            # num_rounds = data["rounds"]
-            # time_limit = data["round_time"]
-            # scoring = data["scoring_scheme"]
-            print(game_uid)
+            select_deck_query = '''
+                                UPDATE captions.game
+                                SET game_deck = \'''' + deck_uid + '''\'
+                                WHERE game_code = \'''' + game_code + '''\';
+                                '''
 
-            new_round_uid = get_new_roundUID(conn)
-            add_user_to_round_query = '''
-                                    INSERT INTO captions.round
-                                    SET round_uid = \'''' + new_round_uid + '''\',
-                                    round_game_uid = \'''' + new_game_uid + '''\',
-                                    round_user_uid = \'''' + user_uid + '''\',
-                                    round_number = 1,
-                                    round_deck_uid = NULL,
-                                    round_image_uid = NULL ,
-                                    caption = NULL,
-                                    votes = 0,
-                                    score = 0, 
-                                    round_started_at = NULL'''
-            add_user = execute(add_user_to_round_query, "post", conn)
-            print("add_user_response: ", add_user)
-            if add_user["code"] == 281:
-                response["round_message"] = "Host added to the game."
-                response["game_code"] = str(game_code)
-                response["host_id"] = user_uid
-                response["host_alias"] = user_alias
+            selected_deck = execute(select_deck_query, "post", conn)
+            print("selected deck info: ", selected_deck)
+
+            if selected_deck["code"] == 281:
+                response["message"] = "281, Deck successfully submitted."
                 return response, 200
-                
+
         except:
-            raise BadRequest("Create Game Request failed")
+            raise BadRequest("Select deck Request failed")
         finally:
             disconnect(conn)
+
+
+class assignDeck(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+            deck_uid = data["deck_uid"]
+            game_code = data["game_code"]
+
+            assign_deck_query = '''
+
+
+                                UPDATE captions.round
+                                SET round_deck_uid = \'''' + deck_uid + '''\'
+                                WHERE round_game_uid = (
+                                    SELECT game_uid
+                                    FROM captions.game
+                                    WHERE game_code = \'''' + game_code + '''\');
+                                '''
+
+            assign_deck = execute(assign_deck_query, "post", conn)
+            print("selected deck info: ", assign_deck)
+
+            if assign_deck["code"] == 281:
+                response["message"] = "281, Deck assigned successfully."
+                return response, 200
+
+        except:
+            raise BadRequest("Assign deck Request failed")
+        finally:
+            disconnect(conn)
+
+
+
+
+# NOT SURE IF WE USE THIS
+# class createRound(Resource):
+#     def post(self):
+#         response = {}
+#         items = {}
+#         try:
+#             conn = connect()
+#             data = request.get_json(force=True)
+#             # print to Received data to Terminal
+#             print("Received:", data)
+
+#             game_uid = data["game_uid"]
+#             # user_uid = data["user_uid"]
+#             # num_rounds = data["rounds"]
+#             # time_limit = data["round_time"]
+#             # scoring = data["scoring_scheme"]
+#             print(game_uid)
+
+#             new_round_uid = get_new_roundUID(conn)
+#             add_user_to_round_query = '''
+#                                     INSERT INTO captions.round
+#                                     SET round_uid = \'''' + new_round_uid + '''\',
+#                                     round_game_uid = \'''' + new_game_uid + '''\',
+#                                     round_user_uid = \'''' + user_uid + '''\',
+#                                     round_number = 1,
+#                                     round_deck_uid = NULL,
+#                                     round_image_uid = NULL ,
+#                                     caption = NULL,
+#                                     votes = 0,
+#                                     score = 0, 
+#                                     round_started_at = NULL'''
+#             add_user = execute(add_user_to_round_query, "post", conn)
+#             print("add_user_response: ", add_user)
+#             if add_user["code"] == 281:
+#                 response["round_message"] = "Host added to the game."
+#                 response["game_code"] = str(game_code)
+#                 response["host_id"] = user_uid
+#                 response["host_alias"] = user_alias
+#                 return response, 200
+                
+#         except:
+#             raise BadRequest("Create Game Request failed")
+#         finally:
+#             disconnect(conn)
 
 
 class checkGame(Resource):
@@ -1563,102 +1023,6 @@ class decks(Resource):
         finally:
             disconnect(conn)
 
-
-# class selectDeck(Resource):
-#     def post(self):
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-#             data = request.get_json(force=True)
-#             # print to Received data to Terminal
-#             print("Received:", data)
-#             deck_uid = data["deck_uid"]
-#             game_code = data["game_code"]
-
-#             select_deck_query = '''
-#                                 UPDATE captions.game
-#                                 SET game_deck = \'''' + deck_uid + '''\'
-#                                 WHERE game_code = \'''' + game_code + '''\';
-#                                 '''
-
-#             selected_deck = execute(select_deck_query, "post", conn)
-#             print("selected deck info: ", selected_deck)
-
-#             if selected_deck["code"] == 281:
-#                 response["message"] = "281, Deck successfully submitted."
-#                 return response, 200
-
-#         except:
-#             raise BadRequest("Select deck Request failed")
-#         finally:
-#             disconnect(conn)
-
-
-    # def post(self):
-    #     response = {}
-    #     items = {}
-    #     try:
-    #         conn = connect()
-    #         data = request.get_json(force=True)
-    #         # print to Received data to Terminal
-    #         print("Received:", data)
-
-    #         deck_uid = get_new_deckUID(conn)
-    #         #deck_uid = execute(get_new_deckUID(), "get", conn)
-    #         deck_title = data["deck_title"]
-    #         deck_user_uid = data["user_uid"]
-
-    #         insert_deck_query = '''
-    #                             INSERT INTO captions.deck
-    #                             SET 
-    #                                 deck_uid = \'''' + deck_uid + '''\',
-    #                                 deck_title = \'''' + deck_title + '''\',
-    #                                 deck_user_uid = \'''' + deck_user_uid + '''\';
-    #                             '''
-
-    #         insertResponse = execute(insert_deck_query, "post", conn)
-    #         print("insert response ", insertResponse)
-
-    #         if insertResponse["code"] == 280:
-    #             response["message"] = "280, User custom deck has been successfully uploaded"
-    #             response["insert info"] = insertResponse["result"]
-    #             return response, 200
-    #     except:
-    #         raise BadRequest("Create deck Request failed")
-    #     finally:
-    #         disconnect(conn)
-
-
-# class selectDeck(Resource):
-#     def post(self):
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-#             data = request.get_json(force=True)
-#             # print to Received data to Terminal
-#             print("Received:", data)
-#             deck_uid = data["deck_uid"]
-#             game_code = data["game_code"]
-#             round_number = data["round_number"]
-
-#             select_deck_query = '''
-#                                 UPDATE captions.round 
-#                                 SET round_deck_uid=\'''' + deck_uid + '''\'
-#                                 WHERE round_game_uid=(SELECT game_uid FROM captions.game
-#                                 WHERE game_code=\'''' + game_code + '''\') 
-#                                 AND round_number=\'''' + round_number + '''\'
-#                                 '''
-#             selected_deck = execute(select_deck_query, "post", conn)
-#             print("selected deck info: ", selected_deck)
-#             if selected_deck["code"] == 281:
-#                 response["message"] = "281, Deck successfully submitted."
-#                 return response, 200
-#         except:
-#             raise BadRequest("Select deck Request failed")
-#         finally:
-#             disconnect(conn)
 
 
 class gameTimer(Resource):
@@ -1920,230 +1284,6 @@ class getUniqueImageInRound(Resource):
         finally:
             disconnect(conn)
 
-
-# class getUniqueImageInRound(Resource):
-#     def get(self, game_code, round_number):
-#         print("requested game_code: ", game_code)
-#         print("requested round_number: ", round_number)
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-
-#             # check_deck_harvard_query = '''
-#             #                     SELECT deck_title
-#             #                     FROM captions.deck
-#             #                     WHERE deck_uid = 
-#             #                         (SELECT DISTINCT round_deck_uid FROM captions.round WHERE round_game_uid = (
-#             #                             SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))'''
-
-#             check_deck_harvard_query = '''
-#                                 SELECT deck_title
-#                                 FROM captions.deck
-#                                 WHERE deck_uid = (
-#                                         SELECT game_deck 
-#                                         FROM captions.game 
-#                                         WHERE game_code = \'''' + game_code + '''\');'''
-
-#             deck_is_harvard = execute(check_deck_harvard_query, "get", conn)
-
-#             # #Version 2 --> post the baseimageurl into the database
-#             # if (deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
-#             #     get_images_query = '''
-#             #                                             SELECT distinct captions.round.round_image_uid
-#             #                                             FROM captions.round
-#             #                                             INNER Join captions.deck
-#             #                                             ON captions.round.round_deck_uid=captions.deck.deck_uid
-#             #                                             WHERE round_game_uid =  (SELECT game_uid FROM captions.game
-#             #                                             WHERE game_code=\'''' + game_code + '''\')
-#             #                                             '''
-#             #     image_info = execute(get_images_query, "get", conn)
-#             #     print("harvard image info: ", image_info)
-#             #
-#             #     images_used = set()
-#             #     for result in image_info["result"]:
-#             #         if result["round_image_uid"] not in images_used:
-#             #             images_used.add(result["round_image_uid"])
-#             #     print(images_used, type(images_used))
-#             #     flag = True
-#             #     # image_uid = ""
-#             #     while flag:
-#             #         image_uid = randint(1, 376513)
-#             #         page = image_uid // 10 + 1
-#             #         index = image_uid % 10
-#             #
-#             #         harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page=" + str(
-#             #             page)
-#             #         print(harvardURL, "(page,index) = (", page, ",", index,")")
-#             #         r = requests.get(harvardURL)
-#             #         image_url = r.json()["records"][index]["baseimageurl"]
-#             #         print("curr index: ", image_uid)
-#             #         if image_url not in images_used:
-#             #             flag = False
-#             #
-#             #     print("next_image_index: ", image_uid, type(image_uid))
-#             #     print("next_image_url: ", image_url, type(image_url))
-#             #     # page = index/10 + 1
-#             #     # index = index%10
-#             #     # page = image_uid // 10 + 1
-#             #     # index = image_uid % 10
-#             #     #
-#             #     # harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page=" + str(
-#             #     #     page)
-#             #     # print(harvardURL)
-#             #     # r = requests.get(harvardURL)
-#             #     # print(index)
-#             #     # print("before return for getUniqueImage ", r.json()["records"][index]["baseimageurl"])
-#             #
-#             #     # image_uid = index
-#             #     image_uid = str(image_uid)
-#             #     # write_to_round_query = '''
-#             #     #                                         UPDATE captions.round
-#             #     #                                         SET round_image_uid=\'''' + image_uid + '''\'
-#             #     #                                         WHERE round_game_uid=(SELECT game_uid FROM captions.game
-#             #     #                                         WHERE game_code=\'''' + game_code + '''\')
-#             #     #                                         AND round_number = \'''' + round_number + '''\'
-#             #     #                                         '''
-#             #     write_to_round_query = '''
-#             #                                                         UPDATE captions.round
-#             #                                                         SET round_image_uid=\'''' + "("+ image_url +")"+ '''\'
-#             #                                                         WHERE round_game_uid=(SELECT game_uid FROM captions.game
-#             #                                                         WHERE game_code=\'''' + game_code + '''\')
-#             #                                                         AND round_number = \'''' + round_number + '''\'
-#             #                                                         '''
-#             #     updated_round = execute(write_to_round_query, "post", conn)
-#             #     print("game_attr_update info: ", updated_round)
-#             #
-#             #     if updated_round["code"] == 281:
-#             #         response["message"] = "281, image in the Round updated."
-#             #         #print("Return url for getUniqueImageInRound ", r.json()["records"][index]["baseimageurl"])
-#             #         response["image_url"] = r.json()["records"][index]["baseimageurl"]
-#             #         response["image_uid"] = image_uid
-#             #         return response, 200
-
-#             if(deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
-#                 get_images_query = '''
-#                                             SELECT distinct captions.round.round_image_uid
-#                                             FROM captions.round
-#                                             INNER Join captions.deck
-#                                             ON captions.round.round_deck_uid=captions.deck.deck_uid
-#                                             WHERE round_game_uid =  (SELECT game_uid FROM captions.game
-#                                             WHERE game_code=\'''' + game_code + '''\')
-#                                             '''
-#                 image_info = execute(get_images_query, "get", conn)
-#                 print("harvard image info: ", image_info)
-
-#                 images_used = set()
-#                 for result in image_info["result"]:
-#                     if result["round_image_uid"] not in images_used:
-#                         images_used.add(result["round_image_uid"])
-#                 print(images_used, type(images_used))
-#                 flag = True
-#                 image_id = ""
-#                 while flag:
-#                     image_uid = randint(1,376513)
-#                     page = image_uid // 10 + 1
-#                     index = image_uid % 10
-
-#                     harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page=" + str(
-#                         page)
-#                     print(harvardURL)
-#                     r = requests.get(harvardURL)
-#                     print(index)
-#                     # print("before return for getUniqueImage ", r.json()["records"][index]["baseimageurl"])
-
-#                     # image_uid = index
-#                     image_uid = r.json()["records"][index]["imageid"]
-#                     image_id = str(image_uid)
-#                     print("curr index: ", image_uid)
-#                     if image_uid not in images_used:
-#                         flag = False
-
-#                 print("next_image_id: ", image_id, type(image_id))
-
-#                 write_to_round_query = '''
-#                                                         UPDATE captions.round
-#                                                         SET round_image_uid=\'''' + image_id + '''\'
-#                                                         WHERE round_game_uid=(SELECT game_uid FROM captions.game
-#                                                         WHERE game_code=\'''' + game_code + '''\')
-#                                                         AND round_number = \'''' + round_number + '''\'
-#                                                         '''
-#                 updated_round = execute(write_to_round_query, "post", conn)
-#                 print("game_attr_update info: ", updated_round)
-
-#                 if updated_round["code"] == 281:
-#                     response["message"] = "281, image in the Round updated."
-#                     #print("Return url for getUniqueImageInRound ", r.json()["records"][index]["baseimageurl"])
-#                     response["image_url"] = r.json()["records"][index]["baseimageurl"]
-#                     response["image_uid"] = image_uid
-#                     return response, 200
-
-#                # return //the end
-
-
-#         #maintain a set of already used integers and choose integers as we need
-#             # if it is already
-
-#             #Below is the code for the non-harvard api decks(do not touch)  >:(
-#             ################################################################################
-#             get_images_query = '''
-#                             SELECT distinct(captions.deck.deck_image_uids), captions.round.round_image_uid
-#                             FROM captions.round
-#                             INNER Join captions.deck
-#                             ON captions.round.round_deck_uid=captions.deck.deck_uid
-#                             WHERE round_game_uid =  (SELECT game_uid FROM captions.game 
-#                             WHERE game_code=\'''' + game_code + '''\')                                
-#                             '''
-#             image_info = execute(get_images_query, "get", conn)
-
-#             print("image info: ", image_info)
-#             if image_info["code"] == 280:
-#                 images_in_deck_str = image_info["result"][0]["deck_image_uids"][2:-2]#.split(', ')
-#                 images_in_deck_str = images_in_deck_str.replace('"', " ")
-#                 images_in_deck = images_in_deck_str.split(" ,  ")
-#                 images_used = set()
-#                 for result in image_info["result"]:
-#                     if result["round_image_uid"] not in images_used:
-#                         images_used.add(result["round_image_uid"])
-#                 print(images_in_deck, type(images_in_deck))
-#                 print(images_used, type(images_used))
-#                 flag = True
-#                 image_uid = ""
-#                 while flag:
-#                     index = random.randint(0, len(images_in_deck)-1)
-#                     print("curr index: ", index)
-#                     if images_in_deck[index] not in images_used:
-#                         image_uid = images_in_deck[index]
-#                         flag = False
-
-#                 print("next_image_uid: ", image_uid, type(image_uid))
-
-#                 response["message1"] = "280, get image request successful."
-#                 get_image_url_query = '''
-#                                     SELECT image_url FROM captions.image
-#                                     WHERE image_uid=\'''' + image_uid + '''\'
-#                                     '''
-#                 image_url = execute(get_image_url_query, "get", conn)
-#                 print("image_url: ", image_url)
-#                 if image_url["code"] == 280:
-#                     #update round image query
-#                     write_to_round_query = '''
-#                                         UPDATE captions.round
-#                                         SET round_image_uid=\'''' + image_uid + '''\'
-#                                         WHERE round_game_uid=(SELECT game_uid FROM captions.game
-#                                         WHERE game_code=\'''' + game_code + '''\')
-#                                         AND round_number = \'''' + round_number + '''\'
-#                                         '''
-#                     updated_round = execute(write_to_round_query, "post", conn)
-#                     print("game_attr_update info: ", updated_round)
-#                     if updated_round["code"] == 281:
-#                         response["message"] = "281, image in the Round updated."
-#                         response["image_url"] = image_url["result"][0]["image_url"]
-#                         return response, 200
-#         except:
-#             raise BadRequest("Get image in round request failed")
-#         finally:
-#             disconnect(conn)
 
 
 # THIS ENDPOINT RETURNS A IMAGE (NOT UNIQUE) FROM UPLOADED IMAGES (NOT FROM A SPECIFIC DECK)
@@ -2813,228 +1953,89 @@ class uploadImage(Resource):
         finally:
             disconnect(conn)
 
-class CheckEmailValidated(Resource):
-    def post(self):
-        response = {}
-        items = {}
-        cus_id = {}
-        try:
-            conn = connect()
-            data = request.get_json(force=True)
-            print("Received:", data)
+# class CheckEmailValidated(Resource):
+#     def post(self):
+#         response = {}
+#         items = {}
+#         cus_id = {}
+#         try:
+#             conn = connect()
+#             data = request.get_json(force=True)
+#             print("Received:", data)
 
-            name = data["name"]
-            email = data["email"]
-            phone_no = data["phone_no"]
-            message = data["message"]
+#             name = data["name"]
+#             email = data["email"]
+#             phone_no = data["phone_no"]
+#             message = data["message"]
 
-            print("name", name)
-            print("email", email)
-            print("phone_no", phone_no)
-            print("message", message)
-
-
-            # CHECK THE DATABASE FOR THE EXISTING STATE OF THE EMAIL_VALIDATED COLUMN.
-            get_verification_code_query = '''
-                                SELECT user_uid, email_validated FROM captions.user WHERE user_email=\'''' + email + '''\'
-                                '''
-            validation = execute(get_verification_code_query, "get", conn)
-            print("validation info: ", validation)
+#             print("name", name)
+#             print("email", email)
+#             print("phone_no", phone_no)
+#             print("message", message)
 
 
-            if len(validation["result"]) == 0:
-                print("List is empty --> Please create a new user")
+#             # CHECK THE DATABASE FOR THE EXISTING STATE OF THE EMAIL_VALIDATED COLUMN.
+#             get_verification_code_query = '''
+#                                 SELECT user_uid, email_validated FROM captions.user WHERE user_email=\'''' + email + '''\'
+#                                 '''
+#             validation = execute(get_verification_code_query, "get", conn)
+#             print("validation info: ", validation)
 
-                #Roshan caught a bug. :)
-                #response[message] = "User does not exist. Please create an account with this email."
-                response["message"] = "User does not exist. Please create an account with this email."
 
-                return response, 200
-            else:
-                print("first element of list", validation["result"][0])
+#             if len(validation["result"]) == 0:
+#                 print("List is empty --> Please create a new user")
 
-            print("User info retrieved --> Checking status of email_validated")
-            if validation["result"][0]["email_validated"] != 'TRUE':
-                code = randint(100,999)
-                print("Email validation code will be set to: ", code)
-                phone_no += str(code)
-                print("Phone #", phone_no)
-                user_uid = validation["result"][0]["user_uid"]
+#                 #Roshan caught a bug. :)
+#                 #response[message] = "User does not exist. Please create an account with this email."
+#                 response["message"] = "User does not exist. Please create an account with this email."
 
-                #Want to remain in safe mode and change only one row? Use this query!
-                set_code_query1 = '''
-                                            UPDATE captions.user
-                                            SET email_validated = \'''' + str(code) + '''\' 
-                                            WHERE user_uid =\'''' + user_uid + '''\' 
-                                            AND user_email=\'''' + email + '''\'
-                                            '''
+#                 return response, 200
+#             else:
+#                 print("first element of list", validation["result"][0])
 
-                #Want to break some rules and possibly change multiple rows at a time? Use this one.
-                set_code_query2 = '''
-                                UPDATE captions.user
-                                SET email_validated =\'''' + str(code) + '''\'
-                                WHERE user_email=\'''' + email + '''\'
-                                '''
-                #print("valid modified example query\n", set_code_query)
-                updateQueryResult = execute(set_code_query2, "post", conn)
-                print("Result of update query: ", updateQueryResult["message"])
+#             print("User info retrieved --> Checking status of email_validated")
+#             if validation["result"][0]["email_validated"] != 'TRUE':
+#                 code = randint(100,999)
+#                 print("Email validation code will be set to: ", code)
+#                 phone_no += str(code)
+#                 print("Phone #", phone_no)
+#                 user_uid = validation["result"][0]["user_uid"]
 
-            else:
-                print("abandon ship")
-                response["message"] = "User has already been verified."
-                return response, 200
-                disconnect(conn)
+#                 #Want to remain in safe mode and change only one row? Use this query!
+#                 set_code_query1 = '''
+#                                             UPDATE captions.user
+#                                             SET email_validated = \'''' + str(code) + '''\' 
+#                                             WHERE user_uid =\'''' + user_uid + '''\' 
+#                                             AND user_email=\'''' + email + '''\'
+#                                             '''
 
-            #SendEmail.get(self, name, email, phone_no, message)
+#                 #Want to break some rules and possibly change multiple rows at a time? Use this one.
+#                 set_code_query2 = '''
+#                                 UPDATE captions.user
+#                                 SET email_validated =\'''' + str(code) + '''\'
+#                                 WHERE user_email=\'''' + email + '''\'
+#                                 '''
+#                 #print("valid modified example query\n", set_code_query)
+#                 updateQueryResult = execute(set_code_query2, "post", conn)
+#                 print("Result of update query: ", updateQueryResult["message"])
 
-            # #  GET CUSTOMER APPOINTMENT INFO
-            # first_name = data["first_name"]
-            # last_name = data["last_name"]
-            # email = data["email"]
-            # phone_no = data["phone_no"]
-            # treatment_uid = data["appt_treatment_uid"]
-            # notes = data["notes"]
-            # datevalue = data["appt_date"]
-            # timevalue = data["appt_time"]
-            # purchase_price = data["purchase_price"]
-            # purchase_date = data["purchase_date"]
-            #
-            # #  PRINT CUSTOMER APPOINTMENT INFO
-            # print("first_name", first_name)
-            # print("last_name", last_name)
-            # print("email", email)
-            # print("phone_no", phone_no)
-            # print("treatment_uid", treatment_uid)
-            # print("notes", notes)
-            # print("date", datevalue)
-            # print("time", timevalue)
-            # print("purchase_price", purchase_price)
-            # print("purchase_date", purchase_date)
+#             else:
+#                 print("abandon ship")
+#                 response["message"] = "User has already been verified."
+#                 return response, 200
+#                 disconnect(conn)
 
-            # #  CREATE CUSTOMER APPOINTMENT UID
-            # # Query [0]  Get New UID
-            # # query = ["CALL new_refund_uid;"]
-            # query = ["CALL nitya.new_appointment_uid;"]
-            # NewIDresponse = execute(query[0], "get", conn)
-            # NewID = NewIDresponse["result"][0]["new_id"]
-            # print("NewID = ", NewID)
-            # # NewID is an Array and new_id is the first element in that array
-            #
-            # #  FIND EXISTING CUSTOMER UID
-            # query1 = (
-            #     """
-            #         SELECT customer_uid FROM nitya.customers
-            #         WHERE customer_email = \'"""
-            #     + email
-            #     + """\'
-            #         AND   customer_phone_num = \'"""
-            #     + phone_no
-            #     + """\';
-            #     """
-            # )
-            # cus_id = execute(query1, "get", conn)
-            # print(cus_id["result"])
-            # for obj in cus_id["result"]:
-            #     NewcustomerID = obj["customer_uid"]
-            #     print(NewcustomerID)
-            #
-            # print(len(cus_id["result"]))
-            #
-            # #  FOR NEW CUSTOMERS - CREATE NEW CUSTOMER UID AND INSERT INTO CUSTOMER TABLE
-            # if len(cus_id["result"]) == 0:
-            #     query = ["CALL nitya.new_customer_uid;"]
-            #     NewIDresponse = execute(query[0], "get", conn)
-            #     NewcustomerID = NewIDresponse["result"][0]["new_id"]
 
-                # customer_insert_query = (
-                #     """
-                #     INSERT INTO nitya.customers
-                #     SET customer_uid = \'"""
-                #     + NewcustomerID
-                #     + """\',
-                #         customer_first_name = \'"""
-                #     + first_name
-                #     + """\',
-                #         customer_last_name = \'"""
-                #     + last_name
-                #     + """\',
-                #         customer_phone_num = \'"""
-                #     + phone_no
-                #     + """\',
-                #         customer_email = \'"""
-                #     + email
-                #     + """\'
-                #     """
-                # )
-            #
-            #     customer_items = execute(customer_insert_query, "post", conn)
-            #     print("NewcustomerID=", NewcustomerID)
-            #
-            # #  FOR EXISTING CUSTOMERS - USE EXISTING CUSTOMER UID
-            # else:
-            #     for obj in cus_id["result"]:
-            #         NewcustomerID = obj["customer_uid"]
-            #         print("customerID = ", NewcustomerID)
+#             SendEmail.get(self, name, email, phone_no, message)  #Temporary comment out for testing purposes
+#             print("send email successful")
 
-            #  convert to new format:  payment_time_stamp = \'''' + getNow() + '''\',
-
-            #  INSERT INTO APPOINTMENTS TABLE
-            # query2 = (
-            #     """
-            #         INSERT INTO nitya.appointments
-            #         SET appointment_uid = \'"""
-            #     + NewID
-            #     + """\',
-            #             appt_customer_uid = \'"""
-            #     + NewcustomerID
-            #     + """\',
-            #             appt_treatment_uid = \'"""
-            #     + treatment_uid
-            #     + """\',
-            #             notes = \'"""
-            #     + str(notes)
-            #     + """\',
-            #             appt_date = \'"""
-            #     + datevalue
-            #     + """\',
-            #             appt_time = \'"""
-            #     + timevalue
-            #     + """\',
-            #             purchase_price = \'"""
-            #     + purchase_price
-            #     + """\',
-            #             purchase_date = \'"""
-            #     + purchase_date
-            #     + """\'
-            #         """
-            # )
-            # items = execute(query2, "post", conn)
-            # query3 = (
-            #     """
-            #         SELECT title FROM nitya.treatments
-            #         WHERE treatment_uid = \'"""
-            #     + treatment_uid
-            #     + """\';
-            #     """
-            # )
-            # treatment = execute(query3, "get", conn)
-            # print(treatment['result'][0]['title'])
-            # # Send receipt emails
-            # name = first_name + " " + last_name
-            # message = treatment['result'][0]['title'] + "," + \
-            #     purchase_price + "," + datevalue + "," + timevalue
-            # print(name)
-
-            SendEmail.get(self, name, email, phone_no, message)  #Temporary comment out for testing purposes
-            print("send email successful")
-
-            response["message"] = "Code has been sent to email"
-            response["result"] = items
-            return response, 200
-        except:
-            raise BadRequest("Check Email Validated Request failed, please try again later.")
-        finally:
-            disconnect(conn)
+#             response["message"] = "Code has been sent to email"
+#             response["result"] = items
+#             return response, 200
+#         except:
+#             raise BadRequest("Check Email Validated Request failed, please try again later.")
+#         finally:
+#             disconnect(conn)
 
         # ENDPOINT AND JSON OBJECT THAT WORKS
         # http://localhost:4000/api/v2/createappointment
@@ -3351,7 +2352,7 @@ class testHarvard(Resource):
 # Define API routes
 api.add_resource(createGame, "/api/v2/createGame")
 api.add_resource(checkGame, "/api/v2/checkGame/<string:game_code>")
-api.add_resource(createUser, "/api/v2/createUser")
+# api.add_resource(createUser, "/api/v2/createUser")
 api.add_resource(addUser, "/api/v2/addUser")
 # api.add_resource(createNewGame, "/api/v2/createNewGame")
 api.add_resource(joinGame, "/api/v2/joinGame")
@@ -3379,7 +2380,7 @@ api.add_resource(getUniqueImageInRound, "/api/v2/getUniqueImageInRound/<string:g
 api.add_resource(uploadImage, "/api/v2/uploadImage")
 api.add_resource(goaway, "/api/v2/goaway")
 api.add_resource(SendEmail, "/api/v2/sendEmail")
-api.add_resource(CheckEmailValidated, "/api/v2/checkEmailValidated")
+# api.add_resource(CheckEmailValidated, "/api/v2/checkEmailValidated")
 api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
 api.add_resource(testHarvard, "/api/v2/testHarvard")
 
