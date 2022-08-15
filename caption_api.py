@@ -1175,6 +1175,45 @@ class selectDeck(Resource):
             disconnect(conn)
 
 
+class assignDeck(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+            deck_uid = data["deck_uid"]
+            game_code = data["game_code"]
+
+            assign_deck_query = '''
+
+
+                                UPDATE captions.round
+                                SET round_deck_uid = \'''' + deck_uid + '''\'
+                                WHERE round_game_uid = (
+                                    SELECT game_uid
+                                    FROM captions.game
+                                    WHERE game_code = \'''' + game_code + '''\');
+                                '''
+
+            assign_deck = execute(assign_deck_query, "post", conn)
+            print("selected deck info: ", assign_deck)
+
+            if assign_deck["code"] == 281:
+                response["message"] = "281, Deck assigned successfully."
+                return response, 200
+
+        except:
+            raise BadRequest("Assign deck Request failed")
+        finally:
+            disconnect(conn)
+
+
+
+
+
 class joinGame(Resource):
     print("In joinGame")
     def post(self):
@@ -1735,6 +1774,7 @@ class getUniqueImageInRound(Resource):
             #                         (SELECT DISTINCT round_deck_uid FROM captions.round WHERE round_game_uid = (
             #                             SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))'''
 
+            print("Check if Harvard Deck")
             check_deck_harvard_query = '''
                                 SELECT deck_title
                                 FROM captions.deck
@@ -1748,6 +1788,7 @@ class getUniqueImageInRound(Resource):
             
 
             if(deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
+                print("User selected Harvard Deck")
                 get_images_query = '''
                                             SELECT distinct captions.round.round_image_uid
                                             FROM captions.round
@@ -1812,6 +1853,9 @@ class getUniqueImageInRound(Resource):
 
             #Below is the code for the non-harvard api decks(do not touch)  >:(
             ################################################################################
+            print("User selected deck other than Harvard")
+
+            # RETURN ALL IMAGES ASSOCIATED WITH A DATABASE DECK
             get_images_query = '''
                             SELECT distinct(captions.deck.deck_image_uids), captions.round.round_image_uid
                             FROM captions.round
@@ -1822,11 +1866,16 @@ class getUniqueImageInRound(Resource):
                             '''
             image_info = execute(get_images_query, "get", conn)
 
-            print("image info: ", image_info)
+            print("\nimage info: ", image_info)
+            print("\nimage result: ", image_info["result"][0])
+            print("\nround image: ", image_info["result"][0]["round_image_uid"])
+
             if image_info["code"] == 280:
                 images_in_deck_str = image_info["result"][0]["deck_image_uids"][2:-2]#.split(', ')
                 images_in_deck_str = images_in_deck_str.replace('"', " ")
                 images_in_deck = images_in_deck_str.split(" ,  ")
+                print("\nImages in deck: ", images_in_deck)
+
                 images_used = set()
                 for result in image_info["result"]:
                     if result["round_image_uid"] not in images_used:
@@ -3311,6 +3360,7 @@ api.add_resource(getPlayers, "/api/v2/getPlayers/<string:game_code>")
 api.add_resource(decks, "/api/v2/decks/<string:user_uid>,<string:public_decks>")
 api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>,<string:round_number>")
 api.add_resource(selectDeck, "/api/v2/selectDeck")
+api.add_resource(assignDeck, "/api/v2/assignDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
 api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>,<string:round_number>")
 api.add_resource(submitCaption, "/api/v2/submitCaption")
