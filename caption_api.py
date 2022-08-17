@@ -747,6 +747,8 @@ class joinGame(Resource):
             if game_info["code"] == 280 and len(game_info["result"]) == 1:
                 game_uid = game_info["result"][0]["game_uid"]
                 print(game_uid)
+                response["num_rounds"] = game_info["result"][0]["num_rounds"]
+                print(game_info["result"][0]["num_rounds"])
 
 
                 # Check if user is already in the game
