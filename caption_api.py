@@ -749,6 +749,8 @@ class joinGame(Resource):
                 print(game_uid)
                 response["num_rounds"] = game_info["result"][0]["num_rounds"]
                 print(game_info["result"][0]["num_rounds"])
+                response["round_duration"] = game_info["result"][0]["time_limit"]
+                print(game_info["result"][0]["time_limit"])
 
 
                 # Check if user is already in the game
