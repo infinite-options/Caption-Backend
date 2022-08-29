@@ -1462,6 +1462,72 @@ class getImageForPlayers(Resource):
             disconnect(conn)
 
 
+class roundImage(Resource):
+
+    def get(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+            round_number = data["round_number"]
+            game_code = data["game_code"]
+            print(round_number)
+
+            images_used_in_round = '''
+                                SELECT round_image_uid,
+                                    COUNT(round_image_uid) AS num_occurances
+                                FROM captions.round
+                                WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
+                                    AND round_number=\'''' + round_number + '''\'
+                                GROUP BY round_image_uid;
+                                '''
+            images = execute(images_used_in_round, "get", conn)
+            print("caption info: ", images["result"])
+            if images["code"] == 280:
+                response["result"] = images["result"]
+                response["message"] = "280, Found Images used in Round."
+                return response, 200
+        except:
+            raise BadRequest("Could not find Images used in Round")
+        finally:
+            disconnect(conn)
+
+
+    def post(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+            round_number = data["round_number"]
+            game_code = data["game_code"]
+            image_uid = data["image"]
+            print(round_number)
+
+            write_to_round_query = '''
+                                    UPDATE captions.round
+                                    SET round_image_uid=\'''' + image_uid + '''\'
+                                    WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                    WHERE game_code=\'''' + game_code + '''\')
+                                    AND round_number = \'''' + round_number + '''\'
+                                    '''
+            updated_round = execute(write_to_round_query, "post", conn)
+            print("Image info written to db: ", updated_round)
+            if updated_round["code"] == 281:
+                response["message2"] = "281, Round updated."
+                return response, 200
+        except:
+            raise BadRequest("Post image in round request failed")
+        finally:
+            disconnect(conn)
+
+
+
 class submitCaption(Resource):
     def post(self):
         response = {}
@@ -2368,6 +2434,11 @@ api.add_resource(selectDeck, "/api/v2/selectDeck")
 api.add_resource(assignDeck, "/api/v2/assignDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
 api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>,<string:round_number>")
+
+api.add_resource(roundImage, "/api/v2/roundImage")
+# api.add_resource(roundImage, "/api/v2/roundImage/<string:game_code>,<string:round_number>")
+
+
 api.add_resource(submitCaption, "/api/v2/submitCaption")
 api.add_resource(getPlayersRemainingToSubmitCaption,
                  "/api/v2/getPlayersRemainingToSubmitCaption/<string:game_code>,<string:round_number>")
