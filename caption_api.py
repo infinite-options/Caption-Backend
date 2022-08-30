@@ -6,6 +6,7 @@
 
 # README:  if there are errors, make sure you have all requirements are loaded
 
+from contextlib import nullcontext
 import os
 import uuid
 import boto3
@@ -1480,20 +1481,38 @@ class getRoundImage(Resource):
             print(game_code)
             print(round_number)
 
-            images_used_in_round = '''
-                                SELECT round_image_uid,
-                                    COUNT(round_image_uid) AS num_occurances
-                                FROM captions.round
-                                WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
-                                    AND round_number=\'''' + round_number + '''\'
-                                GROUP BY round_image_uid;
-                                '''
-            images = execute(images_used_in_round, "get", conn)
-            print("caption info: ", images["result"])
-            if images["code"] == 280:
-                response["result"] = images["result"]
-                response["message"] = "280, Found Images used in Round."
-                return response, 200
+            if round_number != "0":
+
+                images_used_in_round = '''
+                                    SELECT round_image_uid,
+                                        COUNT(round_image_uid) AS num_occurances
+                                    FROM captions.round
+                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
+                                        AND round_number=\'''' + round_number + '''\'
+                                    GROUP BY round_image_uid;
+                                    '''
+                images = execute(images_used_in_round, "get", conn)
+                print("caption info: ", images["result"])
+                if images["code"] == 280:
+                    response["result"] = images["result"]
+                    response["message"] = "280, Found Images used in Round."
+                    return response, 200
+            else:
+                images_used_in_round = '''
+                                    SELECT round_number,
+                                        round_image_uid,
+                                        COUNT(*) AS num_occurances
+                                    FROM captions.round
+                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code='63363261')
+                                    GROUP BY round_image_uid;
+                                    '''
+                images = execute(images_used_in_round, "get", conn)
+                print("caption info: ", images["result"])
+                if images["code"] == 280:
+                    response["result"] = images["result"]
+                    response["message"] = "280, Found Images used in Round."
+                    return response, 200
+
         except:
             raise BadRequest("Could not find Images used in Round")
         finally:
