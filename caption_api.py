@@ -1462,18 +1462,22 @@ class getImageForPlayers(Resource):
             disconnect(conn)
 
 
-class roundImage(Resource):
+class getRoundImage(Resource):
 
-    def get(self):
+    def get(self, game_code, round_number):
         response = {}
         items = {}
         try:
             conn = connect()
-            data = request.get_json(force=True)
+            
             # print to Received data to Terminal
-            print("Received:", data)
-            round_number = data["round_number"]
-            game_code = data["game_code"]
+
+            # Tried to pass JSON object into GET.  Worked in LOCAL HOST but not live.
+            # data = request.get_json(force=True)
+            # print("Received:", data)
+            # round_number = data["round_number"]
+            # game_code = data["game_code"]
+            print(game_code)
             print(round_number)
 
             images_used_in_round = '''
@@ -1495,7 +1499,7 @@ class roundImage(Resource):
         finally:
             disconnect(conn)
 
-
+class postRoundImage(Resource):
     def post(self):
         response = {}
         items = {}
@@ -2435,7 +2439,8 @@ api.add_resource(assignDeck, "/api/v2/assignDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
 api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>,<string:round_number>")
 
-api.add_resource(roundImage, "/api/v2/roundImage")
+api.add_resource(getRoundImage, "/api/v2/getRoundImage/<string:game_code>,<string:round_number>")
+api.add_resource(postRoundImage, "/api/v2/postRoundImage")
 # api.add_resource(roundImage, "/api/v2/roundImage/<string:game_code>,<string:round_number>")
 
 
