@@ -1503,7 +1503,7 @@ class getRoundImage(Resource):
                                         round_image_uid,
                                         COUNT(*) AS num_occurances
                                     FROM captions.round
-                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code='63363261')
+                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
                                     GROUP BY round_image_uid;
                                     '''
                 images = execute(images_used_in_round, "get", conn)
