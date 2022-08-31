@@ -2408,7 +2408,7 @@ api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>,<string:round_
 api.add_resource(selectDeck, "/api/v2/selectDeck")
 api.add_resource(assignDeck, "/api/v2/assignDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
-api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>,<string:round_number>")
+# api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>,<string:round_number>")
 
 api.add_resource(getRoundImage, "/api/v2/getRoundImage/<string:game_code>,<string:round_number>")
 api.add_resource(postRoundImage, "/api/v2/postRoundImage")
