@@ -1127,6 +1127,7 @@ class startPlaying(Resource):
             disconnect(conn)
 
 
+# ENDPOINT IN USE - TEST PRINT STATEMENTS ADDED
 class getUniqueImageInRound(Resource):
     def get(self, game_code, round_number):
         print("requested game_code: ", game_code)
@@ -1292,45 +1293,45 @@ class getUniqueImageInRound(Resource):
 
 
 # THIS ENDPOINT RETURNS A IMAGE (NOT UNIQUE) FROM UPLOADED IMAGES (NOT FROM A SPECIFIC DECK)
-class getImageInRound(Resource):
-    def get(self, game_code, round_number):
-        print("requested game_code: ", game_code)
-        print("requested round_number: ", round_number)
-        response = {}
-        items = {}
-        try:
-            conn = connect()
-            get_image_query = '''
-                            SELECT image_uid, image_url FROM captions.image
-                            ORDER BY RAND()
-                            LIMIT 1                                  
-                            '''
-            image_info = execute(get_image_query, "get", conn)
+# class getImageInRound(Resource):
+#     def get(self, game_code, round_number):
+#         print("requested game_code: ", game_code)
+#         print("requested round_number: ", round_number)
+#         response = {}
+#         items = {}
+#         try:
+#             conn = connect()
+#             get_image_query = '''
+#                             SELECT image_uid, image_url FROM captions.image
+#                             ORDER BY RAND()
+#                             LIMIT 1                                  
+#                             '''
+#             image_info = execute(get_image_query, "get", conn)
 
-            print("image info: ", image_info)
-            if image_info["code"] == 280:
-                response["message1"] = "280, get image request successful."
-                response["image_url"] = image_info["result"][0]["image_url"]
-                image_uid = image_info["result"][0]["image_uid"]
-                #another update round_image query
-                write_to_round_query = '''
-                                    UPDATE captions.round
-                                    SET round_image_uid=\'''' + image_uid + '''\'
-                                    WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                    WHERE game_code=\'''' + game_code + '''\')
-                                    AND round_number = \'''' + round_number + '''\'
-                                    '''
-                updated_round = execute(write_to_round_query, "post", conn)
-                print("game_attr_update info: ", updated_round)
-                if updated_round["code"] == 281:
-                    response["message2"] = "281, Round updated."
-                    return response, 200
-        except:
-            raise BadRequest("Get image in round request failed")
-        finally:
-            disconnect(conn)
+#             print("image info: ", image_info)
+#             if image_info["code"] == 280:
+#                 response["message1"] = "280, get image request successful."
+#                 response["image_url"] = image_info["result"][0]["image_url"]
+#                 image_uid = image_info["result"][0]["image_uid"]
+#                 #another update round_image query
+#                 write_to_round_query = '''
+#                                     UPDATE captions.round
+#                                     SET round_image_uid=\'''' + image_uid + '''\'
+#                                     WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+#                                     WHERE game_code=\'''' + game_code + '''\')
+#                                     AND round_number = \'''' + round_number + '''\'
+#                                     '''
+#                 updated_round = execute(write_to_round_query, "post", conn)
+#                 print("game_attr_update info: ", updated_round)
+#                 if updated_round["code"] == 281:
+#                     response["message2"] = "281, Round updated."
+#                     return response, 200
+#         except:
+#             raise BadRequest("Get image in round request failed")
+#         finally:
+#             disconnect(conn)
 
-
+# ENDPOINT IN USE - TEST PRINT STATEMENTS ADDED
 class getImageForPlayers(Resource):
     def get(self, game_code, round_number):
         print("requested game_code: ", game_code)
@@ -1349,60 +1350,10 @@ class getImageForPlayers(Resource):
                                         SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))'''
             deck_is_harvard = execute(check_deck_harvard_query, "get", conn)
 
-            # #Version 2 --> get the baseimageurl rom the database
-            # if (deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
-            #     # get_image_query = '''
-            #     #                 SELECT DISTINCT captions.round.round_image_uid
-            #     #                 FROM captions.image
-            #     #                 INNER JOIN captions.round
-            #     #                 ON captions.image.image_uid = captions.round.round_image_uid
-            #     #                 WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
-            #     #                 AND round_number=(SELECT MAX(round_number)
-            #     #                                 FROM captions.round
-            #     #                                 WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\'))
-            #     #                 '''
-            #     get_image_query = '''
-            #                                    SELECT DISTINCT captions.round.round_image_uid
-            #                                    FROM captions.round
-            #                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\')
-            #                                    AND round_number = (SELECT MAX(round_number)
-            #                                                        FROM captions.round
-            #                                                        WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))
-            #                                    '''
-            #
-            #     image_info = execute(get_image_query, "get", conn)
-            #     # image_uid = int(image_info["result"][0]["round_image_uid"])
-            #     # print(image_uid, type(image_uid))
-            #     # page = image_uid // 10 + 1
-            #     # index = image_uid % 10
-            #     #
-            #     # harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page=" + str(
-            #     #     page)
-            #     # print(harvardURL)
-            #     # print(index)
-            #     # r = requests.get(harvardURL)
-            #     # print("before return getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
-            #     #
-            #     # print("image info: ", image_info)
-            #     if image_info["code"] == 280:
-            #         response["message"] = "280, get image for players other than host request successful."
-            #         #response["image_uid="] = image_info["result"][0]["round_image_uid"]
-            #         # response["image_url"] = image_info["result"][0]["image_url"]
-            #         #print("Return url for getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
-            #         response["image_url"] = image_info["result"][0]["round_image_uid"]
-            #         return response, 200
+            
 
             if(deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
-                # get_image_query = '''
-                #                 SELECT DISTINCT captions.round.round_image_uid
-                #                 FROM captions.image
-                #                 INNER JOIN captions.round
-                #                 ON captions.image.image_uid = captions.round.round_image_uid
-                #                 WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
-                #                 AND round_number=(SELECT MAX(round_number)
-                #                                 FROM captions.round
-                #                                 WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\'))
-                #                 '''
+                print("In getImageForPlayers in Harvard Deck")
                 get_image_query = '''
                                     SELECT DISTINCT captions.round.round_image_uid
                                     FROM captions.round
@@ -1449,6 +1400,7 @@ class getImageForPlayers(Resource):
                                             FROM captions.round 
                                             WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\'))             
                             '''
+            print("In getImageForPlayers Non Harvard Deck")
             image_info = execute(get_image_query, "get", conn)
 
             print("image info: ", image_info)
@@ -1504,7 +1456,7 @@ class getRoundImage(Resource):
                                         COUNT(*) AS num_occurances
                                     FROM captions.round
                                     WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
-                                    GROUP BY round_image_uid;
+                                    GROUP BY round_image_uid, round_number;
                                     '''
                 images = execute(images_used_in_round, "get", conn)
                 print("caption info: ", images["result"])
