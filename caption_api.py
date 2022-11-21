@@ -2330,6 +2330,98 @@ class SendEmail(Resource):
         finally:
             disconnect(conn)
 
+
+# SEND EMAIL
+class SendError(Resource):
+    def __call__(self):
+        print("In SendError")
+
+    def get(self, code1, code2):
+        print("In Send Error get")
+        try:
+            conn = connect()
+            email = 'pmarathay@yahoo.com'
+
+            print("code 1", code1)
+            print("code 2", code2)
+        
+            # Send email to Client
+            msg = Message(
+                "Captions Error Code Generated",
+                # sender="support@nityaayurveda.com",
+                sender="support@mealsfor.me",
+
+                recipients = ["pmarathay@gmail.com", email]
+                
+            )
+            print("past message")
+            print(msg)
+
+            msg.body = code1
+            #msg.body = "hello17"
+            # msg.body = (
+            #     "Hello " + str(name) + "," + "\n"
+            #     "\n"
+            #     "Thank you for making your appointment with us. \n"
+            #     "Here are your  appointment details: \n"
+            #     "Date: " +
+            #     # str(day) + ", " + str(month_name) + " " +
+            #     str(subject[2][8:10]) + ", " + str(subject[2][0:4]) + "\n"
+            #     "Time: " + str(time) + "\n"
+            #     "Location: 6055 Meridian Ave. Suite 40 A, San Jose, CA 95120. \n"
+            #     "\n"
+            #     "Name: " + str(name) + "\n"
+            #     "Phone: " + str(phone) + "\n"
+            #     "Email: " + str(email) + "\n"
+            #     "\n"
+            #     "Package purchased: " + str(subject[0]) + "\n"
+            #     "Total amount paid: " + str(subject[1]) + "\n"
+            #     "\n"
+            #     "If you have any questions please call or text: \n"
+            #     "Leena Marathay at 408-471-7004, \n"
+            #     "Email Leena@nityaayurveda.com \n"
+            #     "\n"
+            #     "Thank you - Nitya Ayurveda\n\n"
+            # )
+            print("past body")
+            print(msg.body)
+            try: 
+                mail.send(msg)
+                print("after mail.send(msg)")
+                print(msg)
+            except:
+                print("Likely an EMail Credential Issue")
+
+            # # print("first email sent")
+            # # Send email to Host
+            # msg = Message(
+            #     "New Email from Website!",
+            #     sender="support@nityaayurveda.com",
+            #     recipients=["Lmarathay@yahoo.com"],
+            # )
+            # msg.body = (
+            #     "Hi !\n\n"
+            #     "You just got an email from your website! \n"
+            #     "Here are the particulars:\n"
+            #     "Name:      " + name + "\n"
+            #     "Email:     " + email + "\n"
+            #     "Phone:     " + phone + "\n"
+            #     "Subject:   " + subject + "\n"
+            # )
+            # "Thx - Nitya Ayurveda\n\n"
+            # # print('msg-bd----', msg.body)
+            # mail.send(msg)
+
+            return "Email Sent", 200
+
+        except:
+            raise BadRequest("Email Request failed, please try again later.")
+        finally:
+            disconnect(conn)
+
+
+
+
 #Wow! This is my first customized endpoint. More than happy that it actually works :).
 class goaway(Resource):
     def get(self):
@@ -2430,7 +2522,9 @@ api.add_resource(endGame, "/api/v2/endGame/<string:game_code>")
 api.add_resource(getUniqueImageInRound, "/api/v2/getUniqueImageInRound/<string:game_code>,<string:round_number>")
 api.add_resource(uploadImage, "/api/v2/uploadImage")
 api.add_resource(goaway, "/api/v2/goaway")
-api.add_resource(SendEmail, "/api/v2/sendEmail")
+# api.add_resource(SendEmail, "/api/v2/sendEmail")
+api.add_resource(SendEmail, "/api/v2/sendEmail/<string:name>,<string:email>,<string:phone>,<string:subject>")
+api.add_resource(SendError, "/api/v2/sendError/<string:code1>,<string:code2>")
 # api.add_resource(CheckEmailValidated, "/api/v2/checkEmailValidated")
 api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
 api.add_resource(testHarvard, "/api/v2/testHarvard")
