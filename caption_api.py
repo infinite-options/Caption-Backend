@@ -2357,7 +2357,12 @@ class SendError(Resource):
             print("past message")
             print(msg)
 
-            msg.body = code1
+            # msg.body = code1
+
+            msg.body = (
+                "Code 1: " + str(code1) + "\n"
+                "Code 2: " + str(code2) + "\n"
+            )
             #msg.body = "hello17"
             # msg.body = (
             #     "Hello " + str(name) + "," + "\n"
