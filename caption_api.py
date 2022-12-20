@@ -1660,7 +1660,8 @@ class getPlayersWhoHaventVoted(Resource):
         try:
             conn = connect()
             get_players_count_query = '''
-                            SELECT COUNT(votes)-SUM(votes)-SUM(novotes) AS notvoted FROM captions.round
+                            SELECT 
+                                IF(COUNT(votes)-SUM(votes)-SUM(novotes) < 0,0, COUNT(votes)-SUM(votes)-SUM(novotes)) AS notvoted FROM captions.round
                             INNER JOIN captions.user
                             ON captions.round.round_user_uid=captions.user.user_uid
                             WHERE round_game_uid = (SELECT game_uid FROM captions.game
@@ -2529,7 +2530,7 @@ api.add_resource(uploadImage, "/api/v2/uploadImage")
 api.add_resource(goaway, "/api/v2/goaway")
 # api.add_resource(SendEmail, "/api/v2/sendEmail")
 api.add_resource(SendEmail, "/api/v2/sendEmail/<string:name>,<string:email>,<string:phone>,<string:subject>")
-api.add_resource(SendError, "/api/v2/sendError/<string:code1>,<string:code2>")
+api.add_resource(SendError, "/api/v2/sendError/<string:code1>*<string:code2>")
 # api.add_resource(CheckEmailValidated, "/api/v2/checkEmailValidated")
 api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
 api.add_resource(testHarvard, "/api/v2/testHarvard")
