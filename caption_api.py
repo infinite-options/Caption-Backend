@@ -874,53 +874,6 @@ class assignDeck(Resource):
 
 
 
-
-# NOT SURE IF WE USE THIS
-# class createRound(Resource):
-#     def post(self):
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-#             data = request.get_json(force=True)
-#             # print to Received data to Terminal
-#             print("Received:", data)
-
-#             game_uid = data["game_uid"]
-#             # user_uid = data["user_uid"]
-#             # num_rounds = data["rounds"]
-#             # time_limit = data["round_time"]
-#             # scoring = data["scoring_scheme"]
-#             print(game_uid)
-
-#             new_round_uid = get_new_roundUID(conn)
-#             add_user_to_round_query = '''
-#                                     INSERT INTO captions.round
-#                                     SET round_uid = \'''' + new_round_uid + '''\',
-#                                     round_game_uid = \'''' + new_game_uid + '''\',
-#                                     round_user_uid = \'''' + user_uid + '''\',
-#                                     round_number = 1,
-#                                     round_deck_uid = NULL,
-#                                     round_image_uid = NULL ,
-#                                     caption = NULL,
-#                                     votes = 0,
-#                                     score = 0, 
-#                                     round_started_at = NULL'''
-#             add_user = execute(add_user_to_round_query, "post", conn)
-#             print("add_user_response: ", add_user)
-#             if add_user["code"] == 281:
-#                 response["round_message"] = "Host added to the game."
-#                 response["game_code"] = str(game_code)
-#                 response["host_id"] = user_uid
-#                 response["host_alias"] = user_alias
-#                 return response, 200
-                
-#         except:
-#             raise BadRequest("Create Game Request failed")
-#         finally:
-#             disconnect(conn)
-
-
 class checkGame(Resource):
     def get(self, game_code):
         print(game_code)
@@ -1865,6 +1818,172 @@ class createNextRound(Resource):
             disconnect(conn)
 
 
+
+# INSERT ROWS IN Rounds TABLE FOR EACH PLAYER FOR EACH ROUND 
+class createRounds(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+
+            game_code = data["game_code"]
+            imageURLs = data["images"]
+            # deck_uid = data["deck_uid"]
+            # user_uid = data["user_uid"]
+            # num_rounds = data["rounds"]
+            # time_limit = data["round_time"]
+            # scoring = data["scoring_scheme"]
+            print(game_code)
+            print("all images: ", imageURLs)
+            print("individual image: ", imageURLs[0])
+            image_count = len(imageURLs)
+            print("Number of images received: ", image_count)
+            print(len(data))
+            
+            i = 0
+
+            # NEED NUMBER OF ROUNDS, DECK UID AND GAME UID
+            game_query = '''
+                    SELECT *
+                    FROM captions.game
+                    WHERE game_code = \'''' + game_code + '''\';
+                    '''
+            game_data = execute(game_query, "get", conn)
+            print("game data:", game_data["result"])
+            num_rounds = game_data["result"][i]["num_rounds"]
+            print("number of rounds:",  num_rounds )
+            deck_uid = game_data["result"][i]["game_deck"]
+            print("game deck:", deck_uid )
+            game_uid = game_data["result"][i]["game_uid"]
+            print("game UID:", game_uid )
+
+            if image_count != num_rounds:
+                print("image count mismatch")
+                response["message"] = "Image count mismatch."
+                return response
+
+            # NEED NUMBER OF PLAYERS AND PLAYER UID
+            player_query = '''
+                    SELECT DISTINCT round_user_uid
+                    FROM captions.round
+                    WHERE round_game_uid = \'''' + game_uid + '''\';
+                    '''
+            player_data = execute(player_query, "get", conn)
+            print("player data:", player_data["result"])
+            num_players = len(player_data["result"])
+            print("number of players: ", num_players)
+
+            p = 0
+            for p in range(num_players):
+                user_uid = player_data["result"][p]["round_user_uid"]
+                print(user_uid)
+
+
+            # CREATE ROWS FOR EACH PLAYER, EACH ROUND
+            p = 0
+            for n in range(num_rounds):
+                for p in range(num_players):
+                    print("In loop: ", n, p)
+                    new_round_uid = get_new_roundUID(conn)
+                    print(new_round_uid)
+                    user_uid = player_data["result"][p]["round_user_uid"]
+                    print(user_uid)
+                    round = n + 1
+                    image = imageURLs[n]
+                    print(new_round_uid, user_uid, game_uid, round, deck_uid)
+
+                    if round == 1:
+                        add_user_to_next_round_query = '''
+                                                    UPDATE captions.round
+                                                    SET 
+                                                        round_deck_uid= \'''' + deck_uid + '''\',
+                                                        round_image_uid = \'''' + image + '''\'
+                                                    WHERE
+                                                        round_user_uid= \'''' + user_uid + '''\' AND
+                                                        round_game_uid= \'''' + game_uid + '''\';
+                                                    '''
+                    else:
+                        add_user_to_next_round_query = '''
+                                                    INSERT INTO captions.round
+                                                    SET round_uid = \'''' + new_round_uid + '''\',
+                                                    round_user_uid= \'''' + user_uid + '''\',
+                                                    round_game_uid= \'''' + game_uid + '''\',
+                                                    round_number= \'''' + str(round) + '''\', 
+                                                    round_deck_uid= \'''' + deck_uid + '''\',
+                                                    round_image_uid = \'''' + image + '''\',
+                                                    votes=0,
+                                                    score=0
+                                                    '''
+                    next_round = execute(add_user_to_next_round_query, "post", conn)
+                    print("next_round info: ", next_round)
+                    if next_round["code"] == 281:
+                        continue
+                    else:
+                        response["message"] = "Could not add user to the next round."
+                        response["user_uid"] = user_uid
+                        return response, 200
+                continue
+
+            # GET FIRST ROUND IMAGE
+            first_image_query = '''
+                            SELECT DISTINCT round_image_uid 
+                            FROM captions.round
+                            WHERE
+                                round_game_uid = \'''' + game_uid + '''\' AND
+                                round_number = '1';
+                            '''
+            first_image_data = execute(first_image_query, "get", conn)
+            print("first image URL:", first_image_data["result"])
+
+            response["message"] = "281, Next Round successfully created."
+            response["image"] = first_image_data["result"][0]["round_image_uid"]
+            return response, 200
+
+        except:
+            raise BadRequest("Create Game Request failed")
+        finally:
+            disconnect(conn)
+
+
+
+class getNextImage(Resource):
+    def post(self):
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+            # print to Received data to Terminal
+            print("Received:", data)
+            round_number = data["round_number"]
+            game_code = data["game_code"]
+
+            image_query = '''
+                            SELECT DISTINCT round_image_uid 
+                            FROM captions.round
+                            WHERE
+                                round_game_uid = (SELECT game_uid FROM captions.game 
+                                                    WHERE game_code=\'''' + game_code + '''\')
+                                AND round_number=\'''' + round_number + '''\';
+                        '''
+            image = execute(image_query, "get", conn)
+            print("image URL:", image["result"])
+            response["image"] = image["result"][0]["round_image_uid"]
+            return response, 200
+
+        except:
+            raise BadRequest("create next round Request failed")
+        finally:
+            disconnect(conn)
+
+
+
+
+
 class endGame(Resource):
     def get(self, game_code):
         print("game code: ", game_code)
@@ -2507,6 +2626,11 @@ api.add_resource(selectDeck, "/api/v2/selectDeck")
 api.add_resource(assignDeck, "/api/v2/assignDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
 # api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>,<string:round_number>")
+
+
+api.add_resource(createRounds, "/api/v2/createRounds")
+api.add_resource(getNextImage, "/api/v2/getNextImage")
+
 
 api.add_resource(getRoundImage, "/api/v2/getRoundImage/<string:game_code>,<string:round_number>")
 api.add_resource(postRoundImage, "/api/v2/postRoundImage")
