@@ -1483,6 +1483,19 @@ class submitCaption(Resource):
             print("caption info: ", caption)
             if caption["code"] == 281:
                 response["message"] = "281, Caption for the user updated."
+
+                no_caption_submitted_query = '''
+                                            SELECT count(round_user_uid) AS NoCaptionSubmitted
+                                            FROM captions.round
+                                            WHERE round_game_uid = (SELECT game_uid FROM captions.game 
+                                                                    WHERE game_code = \'''' + game_code + '''\') AND
+                                                round_number = \'''' + round_number + '''\' AND
+                                                caption IS NULL
+                                            '''
+                no_caption = execute(no_caption_submitted_query, "get", conn)
+                print("no caption info: ", no_caption["result"][0]["NoCaptionSubmitted"])
+                response["no_caption_submitted"] = no_caption["result"][0]["NoCaptionSubmitted"]
+
                 return response, 200
         except:
             raise BadRequest("submit caption Request failed")
