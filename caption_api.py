@@ -1582,7 +1582,7 @@ class voteCaption(Resource):
                 print("no vote info: ", novote)
                 if novote["code"] == 281:
                     response["message"] = "281, No Vote Recorded."
-                    return response, 200
+                    # return response, 200
 
             else:
                 submit_caption_query = '''
@@ -1597,7 +1597,29 @@ class voteCaption(Resource):
                 print("caption info: ", caption)
                 if caption["code"] == 281:
                     response["message"] = "281, Vote Recorded."
-                    return response, 200
+                    # return response, 200
+
+            get_players_count_query = '''
+                            SELECT 
+                                IF(COUNT(votes)-SUM(votes)-SUM(novotes) < 0,0, COUNT(votes)-SUM(votes)-SUM(novotes)) AS notvoted FROM captions.round
+                            INNER JOIN captions.user
+                            ON captions.round.round_user_uid=captions.user.user_uid
+                            WHERE round_game_uid = (SELECT game_uid FROM captions.game
+                            WHERE game_code=\'''' + game_code + '''\')
+                            AND round_number=\'''' + round_number + '''\'
+                            '''
+            players_count = execute(get_players_count_query, "get", conn)
+
+            print("players info: ", players_count)
+            print("players info code: ", players_count["code"])
+            if players_count["code"] == 280:
+
+                response["message1"] = "280, get players who haven't submitted votes request successful."
+                response["players_count"] = players_count["result"][0]["notvoted"]
+                return response, 200
+
+
+                    
         except:
             raise BadRequest("Voting failed")
         finally:
