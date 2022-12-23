@@ -1679,6 +1679,78 @@ class getScoreBoard(Resource):
         items = {}
         try:
             conn = connect()
+
+            # INCORPORATING updateScores ENDPOINT
+            get_scoring = '''
+                            SELECT scoring_scheme FROM captions.game
+                            WHERE game_code=\'''' + game_code + '''\'
+                            '''
+            scoring_info = execute(get_scoring, "get", conn)
+            print("scoring info: ", scoring_info)
+            if scoring_info["code"] == 280:
+                scoring = scoring_info["result"][0]["scoring_scheme"]
+                print(scoring)
+                if scoring == "R" or scoring == 'r':
+                    highest_votes = 0
+                    second_highest_votes = 0
+                    get_highest_votes = '''
+                                        SELECT MAX(votes) FROM captions.round
+                                        WHERE round_game_uid = (SELECT game_uid FROM captions.game 
+                                            WHERE game_code=\'''' + game_code + '''\')
+                                        AND round_number=\'''' + round_number + '''\'
+                                        '''
+                    winner = execute(get_highest_votes, "get", conn)
+                    print("winner_info:", winner)
+                    if winner["code"] == 280:
+                        highest_votes = str(winner["result"][0]["MAX(votes)"])
+                        print("highest votes: ", highest_votes, type(highest_votes))
+                        get_second_highest_votes = '''
+                                                    SELECT votes FROM captions.round 
+                                                    WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                                        WHERE game_code=\'''' + game_code + '''\') 
+                                                    AND round_number=\'''' + round_number + '''\'
+                                                    AND votes<\'''' + highest_votes + '''\'
+                                                    ORDER BY votes DESC
+                                                    '''
+                        runner_up = execute(get_second_highest_votes, "get", conn)
+                        print("runner-up info:", runner_up)
+                        if runner_up["code"] == 280:
+                            second_highest_votes = str(runner_up["result"][0]["votes"]) if runner_up["result"] and \
+                                                                                           runner_up["result"][0][
+                                                                                               "votes"] > 0 else "-1"
+                            print("second highest votes: ", second_highest_votes, type(second_highest_votes))
+                            update_scores_query = '''
+                                                UPDATE captions.round	
+                                                SET score = CASE
+                                                    WHEN votes=\'''' + highest_votes + '''\' THEN score+5 
+                                                    WHEN votes=\'''' + second_highest_votes + '''\' THEN score+3
+                                                    ELSE 0
+                                                    END
+                                                WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                                    WHERE game_code=\'''' + game_code + '''\')
+                                                AND round_number=\'''' + round_number + '''\'
+                                                '''
+                            update_scores = execute(update_scores_query, "post", conn)
+                            if update_scores["code"] == 281:
+                                response["message"] = "281, update scoreboard by ranking request successful."
+                                # return response, 200
+                elif scoring == "V" or scoring == 'v':
+                    update_score_by_votes_query = '''
+                                                    UPDATE captions.round
+                                                    SET score = 2 * votes
+                                                    WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                                            WHERE game_code=\'''' + game_code + '''\')
+                                                    AND round_number=\'''' + round_number + '''\'
+                                                    '''
+                    update_scores = execute(update_score_by_votes_query, "post", conn)
+                    print("update_score_info: ", update_scores)
+                    if update_scores["code"] == 281:
+                        response["message"] = "281, update scoreboard by votes request successful."
+                        # return response, 200
+
+
+
+
             get_game_score = '''
                             SELECT round_user_uid, SUM(score) as game_score FROM captions.round
                             WHERE round_game_uid=(SELECT game_uid FROM captions.game 
