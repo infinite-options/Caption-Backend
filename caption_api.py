@@ -1762,7 +1762,7 @@ class getScoreBoard(Resource):
             if game_score["code"] == 280:
                 get_score_query = '''
                                 SELECT captions.round.round_user_uid, captions.user.user_alias,
-                                captions.round.caption, captions.round.votes, captions.round.score
+                                captions.round.caption, captions.round.votes, captions.round.score, captions.round.round_image_uid
                                 FROM captions.round
                                 INNER JOIN captions.user
                                 ON captions.round.round_user_uid=captions.user.user_uid
