@@ -63,13 +63,13 @@ import requests
 
 from random import randint
 
+from chromedriver_py import binary_path
 from selenium.webdriver.common.by import By
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService 
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
 import re
+from selenium.webdriver.chrome.options import Options
+
 
 RDS_HOST = "io-mysqldb8.cxjnrciilyjq.us-west-1.rds.amazonaws.com"
 RDS_PORT = 3306
@@ -2727,13 +2727,12 @@ class testHarvard(Resource):
 class get_cnn_json(Resource):
     def get(self):
         options = Options()
-        options.headless = True
+        options.add_argument("--headless=new")
         options.add_argument("--window-size=1920,1080")
         options.add_argument("start-maximized")
         options.add_experimental_option( "prefs", {'protocol_handler.excluded_schemes.tel': False})
-
-        browser = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options) 
-
+        s= Service(binary_path)
+        browser = webdriver.Chrome(service=s, options=options) 
         total_links=[]
         from_val=0
         page_val=1
