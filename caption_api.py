@@ -2737,6 +2737,7 @@ class get_cnn_json(Resource):
         from_val=0
         page_val=1
 
+        print("Total_links: ", total_links)
         while len(total_links)<10:
             base_url = f'https://www.cnn.com/search?q=The+week+in&from={from_val}&size=10&page={page_val}&sort=newest&types=gallery&section='
 
@@ -2744,17 +2745,23 @@ class get_cnn_json(Resource):
             time.sleep(1)
 
             text_sections = browser.find_elements(By.XPATH, "//a[@href][@class='container__link __link']")
+            print("text_selection: ", text_sections )
             text_desc= browser.find_elements(By.XPATH, "//a[@class='container__link __link']")
+            print("text_desc: ", text_desc )
             images= browser.find_elements(By.XPATH, "//img[@src][@class='image__dam-img']")
+            print("Images: ", images )
 
             pattern = r"The week in (\d+) photos"
+            print("Pattern: ", pattern )
 
             for i in range(len(text_sections)):
+                print("Counter: ", i )
                 if re.match(pattern, text_desc[i].text.split("\n")[1]):
                     temp_obj={}
                     temp_obj["article_link"]= text_sections[i].get_attribute("href")
                     temp_obj["thumbnail_link"]=images[i].get_attribute("src")
                     temp_obj["date"]=text_desc[i].text.split("\n")[2]
+                    print("Temp Object: ", temp_obj )
                     total_links.append(temp_obj)
                     if len(total_links)==10:
                         break
@@ -2762,6 +2769,7 @@ class get_cnn_json(Resource):
                         break
             from_val+=10
             page_val+=1
+            print("Page Value: ", page_val )
         browser.close()
         return json.dumps(total_links)
 
