@@ -2726,15 +2726,25 @@ class testHarvard(Resource):
 
 class get_cnn_json(Resource):
     def get(self):
+        print("In get_cnn_json")
         options = Options()
+        print("1")
         options.add_argument("--headless=new")
+        print("2")
         options.add_argument("--window-size=1920,1080")
+        print("3")
         options.add_argument("start-maximized")
+        print("4")
         options.add_experimental_option( "prefs", {'protocol_handler.excluded_schemes.tel': False})
+        print("5")
         s= Service(binary_path)
+        print("6")
         browser = webdriver.Chrome(service=s, options=options) 
+        print("7")
         total_links=[]
+        print("8")
         from_val=0
+        print("9")
         page_val=1
 
         print("Total_links: ", total_links)
