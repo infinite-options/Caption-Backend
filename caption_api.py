@@ -63,14 +63,6 @@ import requests
 
 from random import randint
 
-from chromedriver_py import binary_path
-from selenium.webdriver.common.by import By
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-import re
-from selenium.webdriver.chrome.options import Options
-
-
 RDS_HOST = "io-mysqldb8.cxjnrciilyjq.us-west-1.rds.amazonaws.com"
 RDS_PORT = 3306
 RDS_USER = "admin"
@@ -2722,66 +2714,6 @@ class testHarvard(Resource):
             raise BadRequest("Harvard Request Failed :(")
         finally:
             disconnect(conn)
-
-
-class get_cnn_json(Resource):
-    def get(self):
-        print("In get_cnn_json")
-        options = Options()
-        print("1")
-        options.add_argument("--headless=new")
-        print("2")
-        options.add_argument("--window-size=1920,1080")
-        print("3")
-        options.add_argument("start-maximized")
-        print("4")
-        options.add_experimental_option( "prefs", {'protocol_handler.excluded_schemes.tel': False})
-        print("5")
-        s= Service(binary_path)
-        print("6")
-        browser = webdriver.Chrome(service=s, options=options) 
-        print("7")
-        total_links=[]
-        print("8")
-        from_val=0
-        print("9")
-        page_val=1
-
-        print("Total_links: ", total_links)
-        while len(total_links)<10:
-            base_url = f'https://www.cnn.com/search?q=The+week+in&from={from_val}&size=10&page={page_val}&sort=newest&types=gallery&section='
-
-            browser.get(base_url)
-            time.sleep(1)
-
-            text_sections = browser.find_elements(By.XPATH, "//a[@href][@class='container__link __link']")
-            print("text_selection: ", text_sections )
-            text_desc= browser.find_elements(By.XPATH, "//a[@class='container__link __link']")
-            print("text_desc: ", text_desc )
-            images= browser.find_elements(By.XPATH, "//img[@src][@class='image__dam-img']")
-            print("Images: ", images )
-
-            pattern = r"The week in (\d+) photos"
-            print("Pattern: ", pattern )
-
-            for i in range(len(text_sections)):
-                print("Counter: ", i )
-                if re.match(pattern, text_desc[i].text.split("\n")[1]):
-                    temp_obj={}
-                    temp_obj["article_link"]= text_sections[i].get_attribute("href")
-                    temp_obj["thumbnail_link"]=images[i].get_attribute("src")
-                    temp_obj["date"]=text_desc[i].text.split("\n")[2]
-                    print("Temp Object: ", temp_obj )
-                    total_links.append(temp_obj)
-                    if len(total_links)==10:
-                        break
-            if len(total_links)==10:
-                        break
-            from_val+=10
-            page_val+=1
-            print("Page Value: ", page_val )
-        browser.close()
-        return json.dumps(total_links)
 
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
