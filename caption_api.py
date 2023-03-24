@@ -2766,8 +2766,6 @@ api.add_resource(SendError, "/api/v2/sendError/<string:code1>*<string:code2>")
 api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
 api.add_resource(testHarvard, "/api/v2/testHarvard")
 
-api.add_resource(get_cnn_json, "/api/v2/CNN")
-
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
 if __name__ == "__main__":
