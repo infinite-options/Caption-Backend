@@ -1670,6 +1670,35 @@ class getPlayersWhoHaventVoted(Resource):
         finally:
             disconnect(conn)
 
+class getScores(Resource):
+    def get(self, game_code):
+        print("requested game_code: ", game_code)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+
+            get_game_score = '''
+                            SELECT captions.round.round_user_uid, captions.user.user_alias, SUM(score) as game_score
+                            FROM captions.round
+                            INNER JOIN captions.user
+                            ON captions.round.round_user_uid=captions.user.user_uid
+                            WHERE round_game_uid = (
+                                SELECT game_uid FROM captions.game
+                                WHERE game_code=\'''' + game_code + '''\')
+                            GROUP BY round_user_uid;
+                            '''
+            game_score = execute(get_game_score, "get", conn)
+            # print("game_score_info:", game_score)
+            if game_score["code"] == 280:
+                    response["message"] = "280, getScores request successful."
+                    response["game score"] = game_score["result"]
+                    return response, 200
+        except:
+            raise BadRequest("Get scores request failed")
+        finally:
+            disconnect(conn)
+
 
 class getScoreBoard(Resource):
     def get(self, game_code, round_number):
@@ -2753,6 +2782,7 @@ api.add_resource(getPlayersWhoHaventVoted, "/api/v2/getPlayersWhoHaventVoted/<st
 api.add_resource(createNextRound, "/api/v2/createNextRound")
 api.add_resource(updateScores, "/api/v2/updateScores/<string:game_code>,<string:round_number>")
 api.add_resource(getScoreBoard, "/api/v2/getScoreBoard/<string:game_code>,<string:round_number>")
+api.add_resource(getScores, "/api/v2/getScores/<string:game_code>")
 api.add_resource(startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>")
 api.add_resource(getImageForPlayers, "/api/v2/getImageForPlayers/<string:game_code>,<string:round_number>")
 api.add_resource(endGame, "/api/v2/endGame/<string:game_code>")
