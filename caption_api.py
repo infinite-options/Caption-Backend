@@ -2638,7 +2638,7 @@ class SendError(Resource):
         print("In Send Error get")
         try:
             conn = connect()
-            email = '91meetshah@gmail.com'
+            email = '91meetshah@gmail.com', 'ishankanungo123@gmail.com'
 
             print("code 1", code1)
             print("code 2", code2)
