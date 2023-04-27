@@ -767,7 +767,7 @@ class joinGame(Resource):
                 if existing_player["code"] == 280 and existing_player["result"] != ():
                         response["message"] = "280, Player has already joined the game."
                         response["user_uid"] = user_uid
-                        return response, 200
+                        return response, 409
 
                 else:
                     # User has entered and existing game code and is not in the game
