@@ -63,14 +63,6 @@ import requests
 
 from random import randint
 
-from selenium.webdriver.common.by import By
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService 
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-import re
-
 RDS_HOST = "io-mysqldb8.cxjnrciilyjq.us-west-1.rds.amazonaws.com"
 RDS_PORT = 3306
 RDS_USER = "admin"
@@ -1678,6 +1670,77 @@ class getPlayersWhoHaventVoted(Resource):
         finally:
             disconnect(conn)
 
+class getScores(Resource):
+    def get(self, game_code, round_number):
+        # print("requested game_code: ", game_code)
+        # response = {}
+        # items = {}
+        # try:
+        #     conn = connect()
+
+        #     get_game_score = '''
+        #                     SELECT captions.round.round_user_uid, captions.user.user_alias, SUM(score) as game_score
+        #                     FROM captions.round
+        #                     INNER JOIN captions.user
+        #                     ON captions.round.round_user_uid=captions.user.user_uid
+        #                     WHERE round_game_uid = (
+        #                         SELECT game_uid FROM captions.game
+        #                         WHERE game_code=\'''' + game_code + '''\')
+        #                     GROUP BY round_user_uid;
+        #                     '''
+        #     game_score = execute(get_game_score, "get", conn)
+        #     # print("game_score_info:", game_score)
+        #     if game_score["code"] == 280:
+        #             response["message"] = "280, getScores request successful."
+        #             response["game score"] = game_score["result"]
+        #             return response, 200
+        # except:
+        #     raise BadRequest("Get scores request failed")
+        # finally:
+        #     disconnect(conn)
+        print("requested game_code: ", game_code)
+        print("requested round_number:", round_number)
+        response = {}
+        items = {}
+        try:
+            conn = connect()
+            get_game_score = '''
+                            SELECT round_user_uid, SUM(score) as game_score FROM captions.round
+                            WHERE round_game_uid=(SELECT game_uid FROM captions.game 
+                                WHERE game_code=\'''' + game_code + '''\')
+                            GROUP BY round_user_uid
+                            '''
+            game_score = execute(get_game_score, "get", conn)
+            print("game_score_info:", game_score)
+            if game_score["code"] == 280:
+                get_score_query = '''
+                                SELECT captions.round.round_user_uid, captions.user.user_alias,
+                                captions.round.caption, captions.round.votes, captions.round.score, captions.round.round_image_uid
+                                FROM captions.round
+                                INNER JOIN captions.user
+                                ON captions.round.round_user_uid=captions.user.user_uid
+                                WHERE round_game_uid = (SELECT game_uid FROM captions.game
+                                WHERE game_code=\'''' + game_code + '''\')
+                                AND round_number=\'''' + round_number + '''\'
+                                '''
+                scoreboard = execute(get_score_query, "get", conn)
+                print("score info: ", scoreboard)
+                if scoreboard["code"] == 280:
+                    response["message"] = "280, scoreboard is updated and get_score_board request " \
+                                          "successful."
+                    index = 0
+                    for game_info, round_info in zip(game_score["result"], scoreboard["result"]):
+                        # print("game_score:", game_info)
+                        # print("round_info:", round_info)
+                        scoreboard["result"][index]["game_score"] = game_info["game_score"]
+                        index += 1
+                    response["scoreboard"] = scoreboard["result"]
+                    return response, 200
+        except:
+            raise BadRequest("Get scoreboard request failed")
+        finally:
+            disconnect(conn)
+
 
 class getScoreBoard(Resource):
     def get(self, game_code, round_number):
@@ -2575,7 +2638,7 @@ class SendError(Resource):
         print("In Send Error get")
         try:
             conn = connect()
-            email = 'pmarathay@yahoo.com'
+            email = '91meetshah@gmail.com', 'ishankanungo123@gmail.com'
 
             print("code 1", code1)
             print("code 2", code2)
@@ -2723,49 +2786,6 @@ class testHarvard(Resource):
         finally:
             disconnect(conn)
 
-
-class get_cnn_json(Resource):
-    def get(self):
-        options = Options()
-        options.headless = True
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("start-maximized")
-        options.add_experimental_option( "prefs", {'protocol_handler.excluded_schemes.tel': False})
-
-        browser = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options) 
-
-        total_links=[]
-        from_val=0
-        page_val=1
-
-        while len(total_links)<10:
-            base_url = f'https://www.cnn.com/search?q=The+week+in&from={from_val}&size=10&page={page_val}&sort=newest&types=gallery&section='
-
-            browser.get(base_url)
-            time.sleep(1)
-
-            text_sections = browser.find_elements(By.XPATH, "//a[@href][@class='container__link __link']")
-            text_desc= browser.find_elements(By.XPATH, "//a[@class='container__link __link']")
-            images= browser.find_elements(By.XPATH, "//img[@src][@class='image__dam-img']")
-
-            pattern = r"The week in (\d+) photos"
-
-            for i in range(len(text_sections)):
-                if re.match(pattern, text_desc[i].text.split("\n")[1]):
-                    temp_obj={}
-                    temp_obj["article_link"]= text_sections[i].get_attribute("href")
-                    temp_obj["thumbnail_link"]=images[i].get_attribute("src")
-                    temp_obj["date"]=text_desc[i].text.split("\n")[2]
-                    total_links.append(temp_obj)
-                    if len(total_links)==10:
-                        break
-            if len(total_links)==10:
-                        break
-            from_val+=10
-            page_val+=1
-        browser.close()
-        return json.dumps(total_links)
-
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
 
@@ -2804,6 +2824,7 @@ api.add_resource(getPlayersWhoHaventVoted, "/api/v2/getPlayersWhoHaventVoted/<st
 api.add_resource(createNextRound, "/api/v2/createNextRound")
 api.add_resource(updateScores, "/api/v2/updateScores/<string:game_code>,<string:round_number>")
 api.add_resource(getScoreBoard, "/api/v2/getScoreBoard/<string:game_code>,<string:round_number>")
+api.add_resource(getScores, "/api/v2/getScores/<string:game_code>,<string:round_number>")
 api.add_resource(startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>")
 api.add_resource(getImageForPlayers, "/api/v2/getImageForPlayers/<string:game_code>,<string:round_number>")
 api.add_resource(endGame, "/api/v2/endGame/<string:game_code>")
@@ -2816,8 +2837,6 @@ api.add_resource(SendError, "/api/v2/sendError/<string:code1>*<string:code2>")
 # api.add_resource(CheckEmailValidated, "/api/v2/checkEmailValidated")
 api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
 api.add_resource(testHarvard, "/api/v2/testHarvard")
-
-api.add_resource(get_cnn_json, "/api/v2/CNN")
 
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
