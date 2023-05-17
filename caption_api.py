@@ -30,7 +30,7 @@ from flask_mail import Mail, Message
 # from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 # from flask_cors import CORS
 
-from werkzeug.exceptions import BadRequest, NotFound
+from werkzeug.exceptions import BadRequest, NotFound, InternalServerError
 from werkzeug.security import generate_password_hash, check_password_hash
 
 #  NEED TO SOLVE THIS
@@ -533,6 +533,51 @@ def get_new_deckUID(conn):
 #         finally:
 #             disconnect(conn)
 
+class addUserByEmail(Resource):
+    def post(self):
+        response = {}
+        message = "Email Verification Code Sent"
+        try:
+            conn = connect()
+            data = request.get_json()
+            email = data["email"]
+            query = """SELECT * FROM captions.user
+                        WHERE user_email= \'""" + email + """\'
+                    """
+            user = execute(query, "get", conn)
+            if user['result'] != ():
+                response["user_uid"] = user['result'][0]['user_uid']
+                response["user_code"] = user["result"][0]["email_validated"]
+                response["name"] = user["result"][0]["user_name"]
+                response["alias"] =  user["result"][0]["user_alias"]
+                if user['result'][0]["email_validated"] != "TRUE":
+                    response["user_status"] = "User NOT Validated"
+                    SendEmail.get(self, "User", email, 
+                                  user["result"][0]["email_validated"], message)
+            else:
+                code = str(randint(100,999))
+                new_user_uid = get_new_userUID(conn)
+                query = '''
+                    INSERT INTO captions.user
+                    SET user_uid = \'''' + new_user_uid + '''\',
+                        user_created_at = \'''' + getNow() + '''\',
+                        user_email = \'''' + email + '''\', 
+                        email_validated = \'''' + code + '''\',
+                        user_purchases = NULL
+                    '''
+                items = execute(query, "post", conn)
+                if items["code"] == 281:
+                    response["message"] = "Create User successful"
+                    response["user_uid"] = new_user_uid
+                    response["email_validated"] = code
+                    SendEmail.get(self, "User", email, code, message)
+                return response, 200
+        except Exception as e:
+            raise InternalServerError("An unknown error occurred") from e
+        finally:
+            disconnect(conn)
+        return response, 200
+
 class addUser(Resource):
     def post(self):
         response = {}
@@ -546,7 +591,7 @@ class addUser(Resource):
             user_name = data["user_name"]
             user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
             user_email = data["user_email"]
-            user_zip = data["user_zip"]
+            # user_zip = data["user_zip"]
             # print(data)
             message = "Email Verification Code Sent"
 
@@ -578,21 +623,21 @@ class addUser(Resource):
             
 
                 # CHECK IF ZIP CODE IS IN LIST
-                if user_zip not in user['result'][0]['user_zip_code']:
-                    print("Zip code not in list")
-                    response["user_zip"] = "Zip code not in list"
+                # if user_zip not in user['result'][0]['user_zip_code']:
+                #     print("Zip code not in list")
+                #     response["user_zip"] = "Zip code not in list"
 
 
-                    query = '''
-                        UPDATE captions.user
-                        SET user_zip_code = JSON_ARRAY_APPEND(user_zip_code, '$', \'''' + user_zip + '''\')
-                        WHERE user_email = \'''' + user_email + '''\';
-                        '''
+                #     query = '''
+                #         UPDATE captions.user
+                #         SET user_zip_code = JSON_ARRAY_APPEND(user_zip_code, '$', \'''' + user_zip + '''\')
+                #         WHERE user_email = \'''' + user_email + '''\';
+                #         '''
 
-                    addzip = execute(query, "post", conn)
-                    print("items: ", addzip)
-                    if addzip["code"] == 281:
-                        response["user_zip"] = "Zip code added"
+                #     addzip = execute(query, "post", conn)
+                #     print("items: ", addzip)
+                #     if addzip["code"] == 281:
+                #         response["user_zip"] = "Zip code added"
 
                 # CHECK IF ALIAS HAS CHANGED
                 if user_alias != user['result'][0]['user_alias']:
@@ -2837,6 +2882,7 @@ api.add_resource(SendError, "/api/v2/sendError/<string:code1>*<string:code2>")
 # api.add_resource(CheckEmailValidated, "/api/v2/checkEmailValidated")
 api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
 api.add_resource(testHarvard, "/api/v2/testHarvard")
+api.add_resource(addUserByEmail, "/api/v2/addUserByEmail")
 
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
