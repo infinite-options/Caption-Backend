@@ -687,8 +687,7 @@ class addUser(Resource):
                         user_created_at = \'''' + getNow() + '''\',
                         user_name = \'''' + user_name + '''\', 
                         user_alias = \'''' + user_alias + '''\', 
-                        user_email = \'''' + user_email + '''\', 
-                        user_zip_code = json_array(\'''' + user_zip + '''\'),
+                        user_email = \'''' + user_email + '''\',
                         email_validated = \'''' + code + '''\',
                         user_purchases = NULL
                     '''
@@ -2530,7 +2529,7 @@ class SendEmail(Resource):
             msg = Message(
                 "Thanks for your Email!",
                 # sender="support@nityaayurveda.com",
-                sender="support@mealsfor.me",
+                sender="support@capshnz.com",
                 # recipients=[email],
                 # recipients=[email, "Lmarathay@yahoo.com",
                 #             "pmarathay@gmail.com"],
@@ -2692,7 +2691,7 @@ class SendError(Resource):
             msg = Message(
                 "Captions Error Code Generated",
                 # sender="support@nityaayurveda.com",
-                sender="support@mealsfor.me",
+                sender="support@capshnz.com",
 
                 recipients = ["pmarathay@gmail.com", email]
                 
@@ -2831,6 +2830,34 @@ class testHarvard(Resource):
         finally:
             disconnect(conn)
 
+class addFeedback(Resource):
+    def post(self):
+        response = {}
+        try:
+            conn = connect()
+            data = request.get_json()
+            name = data["name"]
+            email = data["email"]
+            feedback = data["feedback"]
+            query = '''
+                    UPDATE captions.user
+                    SET feedback = CONCAT_WS(\',\', feedback, \'''' + feedback + '''\')
+                    WHERE user_email = \'''' + email + '''\';
+                    '''
+            execute(query, "post", conn)
+            msg = Message(
+                "Feedback by " + name,
+                sender = "support@capshnz.com",
+                recipients = ["pmarathay@gmail.com"],
+                body = feedback
+            )
+            mail.send(msg)
+        except Exception as e:
+            raise InternalServerError("An unknown error occurred") from e
+        finally:
+            disconnect(conn)
+        return response, 200
+
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
 
@@ -2883,6 +2910,7 @@ api.add_resource(SendError, "/api/v2/sendError/<string:code1>*<string:code2>")
 api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
 api.add_resource(testHarvard, "/api/v2/testHarvard")
 api.add_resource(addUserByEmail, "/api/v2/addUserByEmail")
+api.add_resource(addFeedback, "/api/v2/addFeedback")
 
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
