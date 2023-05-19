@@ -103,6 +103,7 @@ app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
 
 #This should not be on Github -- should work on localhost
 # app.config['MAIL_USERNAME'] = "support@mealsfor..."
+# app.config['MAIL_USERNAME'] = "support@capshnz..."
 # app.config['MAIL_PASSWORD'] = "Support..."
 
 
@@ -2530,7 +2531,8 @@ class SendEmail(Resource):
             msg = Message(
                 "Thanks for your Email!",
                 # sender="support@nityaayurveda.com",
-                sender="support@mealsfor.me",
+                # sender="support@mealsfor.me",
+                sender="support@capshnz.com",
                 # recipients=[email],
                 # recipients=[email, "Lmarathay@yahoo.com",
                 #             "pmarathay@gmail.com"],
@@ -2639,7 +2641,8 @@ class SendEmail(Resource):
             # msg = Message("Thanks for your Email!", sender='pmarathay@buildsuccess.org', recipients=[email])
             msg = Message(
                 "Thanks for your Email!",
-                sender="support@nityaayurveda.com",
+                # sender="support@nityaayurveda.com",
+                sender="support@capshnz.com",
                 recipients=[email, "Lmarathay@gmail.com",
                             "pmarathay@gmail.com"],
             )
@@ -2647,8 +2650,8 @@ class SendEmail(Resource):
             msg.body = (
                 "Hi !\n\n"
                 "We are looking forward to meeting with you! \n"
-                "Email support@nityaayurveda.com if you need to get in touch with us directly.\n"
-                "Thx - Nitya Ayurveda\n\n"
+                "Email support@capshnz.com if you need to get in touch with us directly.\n"
+                "Thx - Capshnz Team\n\n"
             )
             # print('msg-bd----', msg.body)
             # print('msg-')
@@ -2692,7 +2695,8 @@ class SendError(Resource):
             msg = Message(
                 "Captions Error Code Generated",
                 # sender="support@nityaayurveda.com",
-                sender="support@mealsfor.me",
+                # sender="support@mealsfor.me",
+                sender="support@capshnz.com",
 
                 recipients = ["pmarathay@gmail.com", email]
                 
