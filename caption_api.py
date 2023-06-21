@@ -2061,6 +2061,10 @@ class createRounds(Resource):
             # time_limit = data["round_time"]
             # scoring = data["scoring_scheme"]
             print(game_code)
+            print("all images: ", imageURLs)
+            print("individual image: ", imageURLs[0])
+            image_count = len(imageURLs)
+            print("Number of images received: ", image_count)
             print(len(data))
             
             i = 0
@@ -2080,85 +2084,72 @@ class createRounds(Resource):
             game_uid = game_data["result"][i]["game_uid"]
             print("game UID:", game_uid )
 
-            if data["replay"]:
-                delete_old_data_query = '''
-                    UPDATE captions.round 
-                    SET caption = NULL, votes = 0, novotes = 0, score = 0 
+            if image_count != num_rounds:
+                print("image count mismatch")
+                response["message"] = "Image count mismatch."
+                return response
+
+            # NEED NUMBER OF PLAYERS AND PLAYER UID
+            player_query = '''
+                    SELECT DISTINCT round_user_uid
+                    FROM captions.round
                     WHERE round_game_uid = \'''' + game_uid + '''\';
                     '''
-                execute(delete_old_data_query, "post", conn)
-            else:
-                print("all images: ", imageURLs)
-                print("individual image: ", imageURLs[0])
-                image_count = len(imageURLs)
-                print("Number of images received: ", image_count)
+            player_data = execute(player_query, "get", conn)
+            print("player data:", player_data["result"])
+            num_players = len(player_data["result"])
+            print("number of players: ", num_players)
 
-                if image_count != num_rounds:
-                    print("image count mismatch")
-                    response["message"] = "Image count mismatch."
-                    return response
+            p = 0
+            for p in range(num_players):
+                user_uid = player_data["result"][p]["round_user_uid"]
+                print(user_uid)
 
-                # NEED NUMBER OF PLAYERS AND PLAYER UID
-                player_query = '''
-                        SELECT DISTINCT round_user_uid
-                        FROM captions.round
-                        WHERE round_game_uid = \'''' + game_uid + '''\';
-                        '''
-                player_data = execute(player_query, "get", conn)
-                print("player data:", player_data["result"])
-                num_players = len(player_data["result"])
-                print("number of players: ", num_players)
 
-                p = 0
+            # CREATE ROWS FOR EACH PLAYER, EACH ROUND
+            p = 0
+            for n in range(num_rounds):
                 for p in range(num_players):
+                    print("In loop: ", n, p)
+                    new_round_uid = get_new_roundUID(conn)
+                    print(new_round_uid)
                     user_uid = player_data["result"][p]["round_user_uid"]
                     print(user_uid)
+                    round = n + 1
+                    image = imageURLs[n]
+                    print(new_round_uid, user_uid, game_uid, round, deck_uid)
 
-
-                # CREATE ROWS FOR EACH PLAYER, EACH ROUND
-                p = 0
-                for n in range(num_rounds):
-                    for p in range(num_players):
-                        print("In loop: ", n, p)
-                        new_round_uid = get_new_roundUID(conn)
-                        print(new_round_uid)
-                        user_uid = player_data["result"][p]["round_user_uid"]
-                        print(user_uid)
-                        round = n + 1
-                        image = imageURLs[n]
-                        print(new_round_uid, user_uid, game_uid, round, deck_uid)
-
-                        if round == 1:
-                            add_user_to_next_round_query = '''
-                                                        UPDATE captions.round
-                                                        SET 
-                                                            round_deck_uid= \'''' + deck_uid + '''\',
-                                                            round_image_uid = \'''' + image + '''\'
-                                                        WHERE
-                                                            round_user_uid= \'''' + user_uid + '''\' AND
-                                                            round_game_uid= \'''' + game_uid + '''\';
-                                                        '''
-                        else:
-                            add_user_to_next_round_query = '''
-                                                        INSERT INTO captions.round
-                                                        SET round_uid = \'''' + new_round_uid + '''\',
-                                                        round_user_uid= \'''' + user_uid + '''\',
-                                                        round_game_uid= \'''' + game_uid + '''\',
-                                                        round_number= \'''' + str(round) + '''\', 
+                    if round == 1:
+                        add_user_to_next_round_query = '''
+                                                    UPDATE captions.round
+                                                    SET 
                                                         round_deck_uid= \'''' + deck_uid + '''\',
-                                                        round_image_uid = \'''' + image + '''\',
-                                                        votes=0,
-                                                        score=0
-                                                        '''
-                        next_round = execute(add_user_to_next_round_query, "post", conn)
-                        print("next_round info: ", next_round)
-                        if next_round["code"] == 281:
-                            continue
-                        else:
-                            response["message"] = "Could not add user to the next round."
-                            response["user_uid"] = user_uid
-                            return response, 200
-                    continue
+                                                        round_image_uid = \'''' + image + '''\'
+                                                    WHERE
+                                                        round_user_uid= \'''' + user_uid + '''\' AND
+                                                        round_game_uid= \'''' + game_uid + '''\';
+                                                    '''
+                    else:
+                        add_user_to_next_round_query = '''
+                                                    INSERT INTO captions.round
+                                                    SET round_uid = \'''' + new_round_uid + '''\',
+                                                    round_user_uid= \'''' + user_uid + '''\',
+                                                    round_game_uid= \'''' + game_uid + '''\',
+                                                    round_number= \'''' + str(round) + '''\', 
+                                                    round_deck_uid= \'''' + deck_uid + '''\',
+                                                    round_image_uid = \'''' + image + '''\',
+                                                    votes=0,
+                                                    score=0
+                                                    '''
+                    next_round = execute(add_user_to_next_round_query, "post", conn)
+                    print("next_round info: ", next_round)
+                    if next_round["code"] == 281:
+                        continue
+                    else:
+                        response["message"] = "Could not add user to the next round."
+                        response["user_uid"] = user_uid
+                        return response, 200
+                continue
 
             # GET FIRST ROUND IMAGE
             first_image_query = '''
