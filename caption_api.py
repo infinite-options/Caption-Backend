@@ -2861,6 +2861,35 @@ class addFeedback(Resource):
         finally:
             disconnect(conn)
         return response, 200
+    
+
+class summary(Resource):
+    def get(self):
+        response = {}
+        try:
+            conn = connect()
+            game_uid = request.args.get("gameUID")
+            query = '''
+                    SELECT r1.*
+                    FROM captions.round r1
+                        INNER JOIN (
+                            SELECT round_uid,
+                                MAX(score) AS max_score
+                            FROM captions.round
+                            WHERE round_game_uid = \'''' + game_uid + '''\'
+                            GROUP BY round_number
+                        ) r2 ON r1.round_uid = r2.round_uid
+                        and r1.score = r2.max_score
+                        ORDER BY r1.round_number;
+                    '''
+            captions = execute(query, "get", conn)["result"]
+            response["captions"] = captions
+        except Exception as e:
+            raise InternalServerError("An unknown error occurred") from e
+        finally:
+            disconnect(conn)
+        return response, 200
+
 
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
@@ -2915,6 +2944,7 @@ api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
 api.add_resource(testHarvard, "/api/v2/testHarvard")
 api.add_resource(addUserByEmail, "/api/v2/addUserByEmail")
 api.add_resource(addFeedback, "/api/v2/addFeedback")
+api.add_resource(summary, "/api/v2/summary")
 
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
