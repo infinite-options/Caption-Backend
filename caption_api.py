@@ -2873,13 +2873,14 @@ class summary(Resource):
                     SELECT r1.*
                     FROM captions.round r1
                         INNER JOIN (
-                            SELECT round_uid,
+                            SELECT round_game_uid,
                                 MAX(score) AS max_score
                             FROM captions.round
                             WHERE round_game_uid = \'''' + game_uid + '''\'
                             GROUP BY round_number
-                        ) r2 ON r1.round_uid = r2.round_uid
-                        and r1.score = r2.max_score
+                        ) r2 ON r1.round_game_uid = r2.round_game_uid
+                        AND r1.score = r2.max_score
+                        GROUP BY r1.round_uid, r1.round_number
                         ORDER BY r1.round_number;
                     '''
             captions = execute(query, "get", conn)["result"]
@@ -2890,6 +2891,59 @@ class summary(Resource):
             disconnect(conn)
         return response, 200
 
+class summaryEmail(Resource):
+    def post(self):
+        try:
+            conn = connect()
+            data = request.get_json()
+            game_uid = data["gameUID"]
+            host_email = data["email"]
+            query = '''
+                    SELECT r1.*
+                    FROM captions.round r1
+                        INNER JOIN (
+                            SELECT round_game_uid,
+                                MAX(score) AS max_score
+                            FROM captions.round
+                            WHERE round_game_uid = \'''' + game_uid + '''\'
+                            GROUP BY round_number
+                        ) r2 ON r1.round_game_uid = r2.round_game_uid
+                        AND r1.score = r2.max_score
+                        GROUP BY r1.round_uid, r1.round_number
+                        ORDER BY r1.round_number;
+                    '''
+            captions = execute(query, "get", conn)["result"]
+            content = ""
+            for caption in captions:
+                content = content + """
+                    <div style="text-align:center;display:block;margin-left:auto;margin-right:auto;">
+                        <h3>Round: """ + str(caption["round_number"]) + """</h3>
+                        <img src= """ + caption["round_image_uid"] + """ style="display:block;margin-left:auto;margin-right:auto;width:50%;height:50%;">
+                        <h4>Caption: """ + caption["caption"] + """</h4>
+                    </div>
+                """
+            msg_html = """
+                <!DOCTYPE html>
+                <html>
+                    <body style="align:center">
+                        <div style="padding:20px 0px">
+                            <h2>Winning captions</h2>
+                            """ + content + """
+                        </div>
+                    </body>
+                </html>
+            """
+            msg = Message(
+                "Capshnz summary",
+                sender = "support@capshnz.com",
+                recipients = [host_email],
+                html = msg_html
+            )
+            mail.send(msg)
+        except Exception as e:
+            raise InternalServerError("An unknown error occurred") from e
+        finally:
+            disconnect(conn)
 
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
@@ -2945,6 +2999,7 @@ api.add_resource(testHarvard, "/api/v2/testHarvard")
 api.add_resource(addUserByEmail, "/api/v2/addUserByEmail")
 api.add_resource(addFeedback, "/api/v2/addFeedback")
 api.add_resource(summary, "/api/v2/summary")
+api.add_resource(summaryEmail, "/api/v2/summaryEmail")
 
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
