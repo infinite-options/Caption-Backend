@@ -2873,17 +2873,26 @@ class summary(Resource):
                     SELECT r1.*
                     FROM captions.round r1
                         INNER JOIN (
-                            SELECT round_game_uid,
+                            SELECT round_game_uid, 
+                                round_number, 
                                 MAX(score) AS max_score
                             FROM captions.round
                             WHERE round_game_uid = \'''' + game_uid + '''\'
                             GROUP BY round_number
-                        ) r2 ON r1.round_game_uid = r2.round_game_uid
+                        ) r2 ON r1.round_game_uid = r2.round_game_uid 
+                        AND r1.round_number = r2.round_number 
                         AND r1.score = r2.max_score
                         GROUP BY r1.round_uid, r1.round_number
                         ORDER BY r1.round_number;
                     '''
             captions = execute(query, "get", conn)["result"]
+            round_number_set = set()
+            for caption in captions:
+                if caption["round_number"] in round_number_set:
+                    del caption["round_number"]
+                    del caption["round_image_uid"]
+                else:
+                    round_number_set.add(caption["round_number"])
             response["captions"] = captions
         except Exception as e:
             raise InternalServerError("An unknown error occurred") from e
@@ -2902,26 +2911,35 @@ class summaryEmail(Resource):
                     SELECT r1.*
                     FROM captions.round r1
                         INNER JOIN (
-                            SELECT round_game_uid,
+                            SELECT round_game_uid, 
+                                round_number, 
                                 MAX(score) AS max_score
                             FROM captions.round
                             WHERE round_game_uid = \'''' + game_uid + '''\'
                             GROUP BY round_number
-                        ) r2 ON r1.round_game_uid = r2.round_game_uid
+                        ) r2 ON r1.round_game_uid = r2.round_game_uid 
+                        AND r1.round_number = r2.round_number 
                         AND r1.score = r2.max_score
                         GROUP BY r1.round_uid, r1.round_number
                         ORDER BY r1.round_number;
                     '''
             captions = execute(query, "get", conn)["result"]
             content = ""
+            round_number_set = set()
             for caption in captions:
-                content = content + """
-                    <div style="text-align:center;display:block;margin-left:auto;margin-right:auto;">
+                round_img = "" 
+                if caption["round_number"] not in round_number_set:
+                    round_img = """
                         <h3>Round: """ + str(caption["round_number"]) + """</h3>
                         <img src= """ + caption["round_image_uid"] + """ style="display:block;margin-left:auto;margin-right:auto;width:50%;height:50%;">
+                    """    
+                content = content + """
+                    <div style="text-align:center;display:block;margin-left:auto;margin-right:auto;">
+                        """ + round_img + """
                         <h4>Caption: """ + caption["caption"] + """</h4>
                     </div>
                 """
+                round_number_set.add(caption["round_number"])
             msg_html = """
                 <!DOCTYPE html>
                 <html>
