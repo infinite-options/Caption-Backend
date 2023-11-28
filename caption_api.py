@@ -2781,7 +2781,8 @@ class getCurrentRoundDetails(Resource):
             query = '''
                         SELECT * FROM captions.round
                         WHERE round_game_uid = \'''' + game_uid + '''\'
-                        ORDER BY round_number DESC;                   
+                        ORDER BY round_number DESC
+                        LIMIT 1;                   
                     '''
             captions = execute(query, "get", conn)["result"]
             response["captions"] = captions
