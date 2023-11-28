@@ -2771,6 +2771,25 @@ class SendError(Resource):
             disconnect(conn)
 
 
+class getCurrentRoundDetails(Resource):
+    def get(self):
+        print("current round requested")
+        response = {}
+        try:
+            conn = connect()
+            game_uid = request.args.get("gameUID")
+            query = '''
+                        SELECT * FROM captions.round
+                        WHERE round_game_uid = \'''' + game_uid + '''\'
+                        ORDER BY round_number DESC;                   
+                    '''
+            captions = execute(query, "get", conn)["result"]
+            response["captions"] = captions
+        except Exception as e:
+            raise InternalServerError("An unknown error occurred") from e
+        finally:
+            disconnect(conn)
+        return response, 200
 
 
 #Wow! This is my first customized endpoint. More than happy that it actually works :).
@@ -3019,6 +3038,8 @@ api.add_resource(addFeedback, "/api/v2/addFeedback")
 api.add_resource(summary, "/api/v2/summary")
 api.add_resource(summaryEmail, "/api/v2/summaryEmail")
 
+#api to fetch current round
+api.add_resource(getCurrentRoundDetails, "/api/v2/getCurrentRound")
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
 if __name__ == "__main__":
