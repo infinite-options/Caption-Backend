@@ -2792,6 +2792,31 @@ class getCurrentRoundDetails(Resource):
             disconnect(conn)
         return response, 200
 
+class getCurrentGameDetails(Resource):
+    def get(self):
+        print("current round requested")
+        response = {}
+        try:
+            conn = connect()
+            game_uid = request.args.get("gameUID")
+            query = '''
+                    SELECT -- *,
+                        round_game_uid, round_number, round_image_uid
+                        , COUNT(caption) AS captions_submitted
+                        , SUM(votes) AS votes_submitted
+                    FROM captions.round
+                    -- WHERE round_game_uid = "200-002758"
+                    WHERE round_game_uid = \'''' + game_uid + '''\'
+                    GROUP BY round_game_uid, round_number                  
+                    '''
+            captions = execute(query, "get", conn)["result"]
+            response["captions"] = captions
+        except Exception as e:
+            raise InternalServerError("An unknown error occurred") from e
+        finally:
+            disconnect(conn)
+        return response, 200
+
 
 #Wow! This is my first customized endpoint. More than happy that it actually works :).
 class goaway(Resource):
@@ -3041,6 +3066,7 @@ api.add_resource(summaryEmail, "/api/v2/summaryEmail")
 
 #api to fetch current round
 api.add_resource(getCurrentRoundDetails, "/api/v2/getCurrentRound")
+api.add_resource(getCurrentGameDetails, "/api/v2/getCurrentGame")
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
 if __name__ == "__main__":
