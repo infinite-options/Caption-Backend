@@ -26,6 +26,7 @@ from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_mail import Mail, Message
 
+from cnn_webscrape import lambda_handler
 # used for serializer email and error handling
 # from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 # from flask_cors import CORS
@@ -2963,6 +2964,21 @@ class summaryEmail(Resource):
         finally:
             disconnect(conn)
 
+
+class cnnWebscrape:
+    async def get(self):
+        print("in cnn web scraper")
+        response={}
+        try:
+            cnnURLList = await lambda_handler()
+            response["cnnURL"] = cnnURLList
+        except Exception as e:
+            raise InternalServerError("An unknown error occurred") from e
+        finally:
+            print("response ->", cnnURLList)
+        return response,200
+
+    
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
 
@@ -3019,6 +3035,9 @@ api.add_resource(addFeedback, "/api/v2/addFeedback")
 api.add_resource(summary, "/api/v2/summary")
 api.add_resource(summaryEmail, "/api/v2/summaryEmail")
 
+
+## webscrape api
+api.add_resource(cnnWebscrape , "/api/v2/cnn_webscrape")
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
 if __name__ == "__main__":
