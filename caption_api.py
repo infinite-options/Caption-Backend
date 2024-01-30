@@ -768,8 +768,8 @@ class createGame(Resource):
 
 
 class joinGame(Resource):
-    print("In joinGame")
     def post(self):
+        print("In joinGame")
         response = {}
         returning_user = {}
         new_user = {}
@@ -854,6 +854,7 @@ class joinGame(Resource):
 
 class selectDeck(Resource):
     def post(self):
+        print("in select deck")
         response = {}
         items = {}
         try:
@@ -2965,12 +2966,12 @@ class summaryEmail(Resource):
             disconnect(conn)
 
 
-class cnnWebscrape:
-    async def get(self):
+class CNNWebScrape(Resource):
+     def get(self):
         print("in cnn web scraper")
         response={}
         try:
-            cnnURLList = await lambda_handler()
+            cnnURLList =  lambda_handler()
             response["cnnURL"] = cnnURLList
         except Exception as e:
             raise InternalServerError("An unknown error occurred") from e
@@ -3037,7 +3038,7 @@ api.add_resource(summaryEmail, "/api/v2/summaryEmail")
 
 
 ## webscrape api
-api.add_resource(cnnWebscrape , "/api/v2/cnn_webscrape")
+api.add_resource(CNNWebScrape , "/api/v2/cnn_webscrape")
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
 if __name__ == "__main__":
