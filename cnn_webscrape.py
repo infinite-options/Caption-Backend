@@ -95,13 +95,15 @@ class CNNWebScrape:
     def __init__(self):
         print("in cnn webscrape init")
         options = Options()
-        options.binary_location = "/opt/headless-chromium"
+        options.binary_location = "./chromedriver/headless-chromium"
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--single-process")
         options.add_argument("--disable-dev-shm-usage")
 
-        self.browser = webdriver.Chrome("/opt/chromedriver", chrome_options=options)
+        # self.browser = webdriver.Chrome("/opt/chromedriver", chrome_options=options)
+        chromedriver_path = "./chromedriver/chromedriver.exe"  # Replace with your actual path
+        self.browser = webdriver.Chrome(executable_path=chromedriver_path, chrome_options=options)
         self.total_links = []
         self.from_val = 0
         self.page_val = 1

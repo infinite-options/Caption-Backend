@@ -26,7 +26,7 @@ from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_mail import Mail, Message
 
-from cnn_webscrape import lambda_handler
+# from cnn_webscrape import lambda_handler
 # used for serializer email and error handling
 # from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 # from flask_cors import CORS
@@ -2971,14 +2971,26 @@ class CNNWebScrape(Resource):
         print("in cnn web scraper")
         response={}
         try:
-            cnnURLList =  lambda_handler()
-            response["cnnURL"] = cnnURLList
-        except Exception as e:
-            raise InternalServerError("An unknown error occurred") from e
-        finally:
-            print("response ->", cnnURLList)
-        return response,200
+            conn = connect()
+            # query = '''
+            #     SELECT game_uid FROM captions.game
+            #     WHERE game_code = \'''' + game_code + '''\';
+            #     '''
+            # query  = 'SELECT * FROM cnn_images'
+            query = 'SELECT id, week_no, year, url FROM cnn_images'
+            items = execute(query, "get", conn)
+            print("items: ", items)
+            if items["code"] == 280:
+                response["message"] = "Fetch successful"
+                response["data"] = items["result"]
+            else:
+                response["message"] = "Fetch was unsuccessful"
 
+        except:
+            raise BadRequest("CNN Image fetch failed")
+        finally:
+            disconnect(conn)
+        return response
     
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
