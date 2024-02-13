@@ -2977,7 +2977,7 @@ class CNNWebScrape(Resource):
             #     WHERE game_code = \'''' + game_code + '''\';
             #     '''
             # query  = 'SELECT * FROM cnn_images'
-            query = 'SELECT id, article_link, week_no, year, thumbnail_link FROM cnn_images'
+            query = 'SELECT id, article_link,date, week_no, year, thumbnail_link, title FROM cnn_images'
             items = execute(query, "get", conn)
             print("items: ", items)
             if items["code"] == 280:
