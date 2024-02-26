@@ -2565,7 +2565,8 @@ class SendEmail(Resource):
             #some kind of function missing?
             #another reason: missing the env files?
             print(msg)
-            msg.body = code
+            # msg.body = code
+            msg.body = subject
             #msg.body = "hello17"
             # msg.body = (
             #     "Hello " + str(name) + "," + "\n"
