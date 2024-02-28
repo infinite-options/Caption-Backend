@@ -26,6 +26,7 @@ from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_mail import Mail, Message
 
+# from cnn_webscrape import lambda_handler
 # used for serializer email and error handling
 # from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 # from flask_cors import CORS
@@ -767,8 +768,8 @@ class createGame(Resource):
 
 
 class joinGame(Resource):
-    print("In joinGame")
     def post(self):
+        print("In joinGame")
         response = {}
         returning_user = {}
         new_user = {}
@@ -853,6 +854,7 @@ class joinGame(Resource):
 
 class selectDeck(Resource):
     def post(self):
+        print("in select deck")
         response = {}
         items = {}
         try:
@@ -2563,7 +2565,8 @@ class SendEmail(Resource):
             #some kind of function missing?
             #another reason: missing the env files?
             print(msg)
-            msg.body = code
+            # msg.body = code
+            msg.body = subject
             #msg.body = "hello17"
             # msg.body = (
             #     "Hello " + str(name) + "," + "\n"
@@ -2963,6 +2966,33 @@ class summaryEmail(Resource):
         finally:
             disconnect(conn)
 
+
+class CNNWebScrape(Resource):
+     def get(self):
+        print("in cnn web scraper")
+        response={}
+        try:
+            conn = connect()
+            # query = '''
+            #     SELECT game_uid FROM captions.game
+            #     WHERE game_code = \'''' + game_code + '''\';
+            #     '''
+            # query  = 'SELECT * FROM cnn_images'
+            query = 'SELECT id, article_link,date, week_no, year, thumbnail_link, title FROM cnn_images'
+            items = execute(query, "get", conn)
+            print("items: ", items)
+            if items["code"] == 280:
+                response["message"] = "Fetch successful"
+                response["data"] = items["result"]
+            else:
+                response["message"] = "Fetch was unsuccessful"
+
+        except:
+            raise BadRequest("CNN Image fetch failed")
+        finally:
+            disconnect(conn)
+        return response
+    
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
 
@@ -3019,6 +3049,9 @@ api.add_resource(addFeedback, "/api/v2/addFeedback")
 api.add_resource(summary, "/api/v2/summary")
 api.add_resource(summaryEmail, "/api/v2/summaryEmail")
 
+
+## webscrape api
+api.add_resource(CNNWebScrape , "/api/v2/cnn_webscrape")
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
 if __name__ == "__main__":
