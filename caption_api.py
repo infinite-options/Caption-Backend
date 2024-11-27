@@ -107,9 +107,6 @@ app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
 # app.config['MAIL_USERNAME'] = "support@capshnz..."
 # app.config['MAIL_PASSWORD'] = "Support..."
 
-app.config['MAIL_USERNAME'] = "support@capshnz.com"
-app.config['MAIL_PASSWORD'] = "Supportcapshnz1!"
-
 
 # Setting for mydomain.com
 app.config["MAIL_SERVER"] = "smtp.mydomain.com"
