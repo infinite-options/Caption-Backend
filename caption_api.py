@@ -107,6 +107,9 @@ app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
 # app.config['MAIL_USERNAME'] = "support@capshnz..."
 # app.config['MAIL_PASSWORD'] = "Support..."
 
+app.config['MAIL_USERNAME'] = "support@capshnz.com"
+app.config['MAIL_PASSWORD'] = "Supportcapshnz1!"
+
 
 # Setting for mydomain.com
 app.config["MAIL_SERVER"] = "smtp.mydomain.com"
@@ -265,13 +268,12 @@ def serializeResponse(response):
 # OPTIONAL: Set skipSerialization to True to skip default JSON response serialization
 def execute(sql, cmd, conn, skipSerialization=False):
     response = {}
-    print("in Execute")
-    print(cmd)
+    print("in Execute", cmd)
     try:
         with conn.cursor() as cur:
-            print("before query")
+            # print("before query")
             cur.execute(sql)
-            print("after query")
+            # print("after query")
             if cmd == "get":
                 result = cur.fetchall()
                 response["message"] = "Successfully executed SQL query."
@@ -281,9 +283,9 @@ def execute(sql, cmd, conn, skipSerialization=False):
                     result = serializeResponse(result)
                 response["result"] = result
             elif cmd == "post":
-                print("in POST")
+                # print("in POST")
                 conn.commit()
-                print("after commit")
+                # print("after commit")
                 response["message"] = "Successfully committed SQL command."
                 # Return status code of 281 for successful POST request
                 response["code"] = 281
@@ -332,20 +334,17 @@ def get_new_gameUID(conn):
         return newGameQuery['result'][0]['new_id']
     return "Could not generate new game UID", 500
 
-
 def get_new_roundUID(conn):
     newRoundQuery = execute("CALL captions.new_round_uid()", 'get', conn)
     if newRoundQuery['code'] == 280:
         return newRoundQuery['result'][0]['new_id']
     return "Could not generate new game UID", 500
 
-
 def get_new_userUID(conn):
     newPurchaseQuery = execute("CALL captions.new_user_uid()", 'get', conn)
     if newPurchaseQuery['code'] == 280:
         return newPurchaseQuery['result'][0]['new_id']
     return "Could not generate new user UID", 500
-
 
 def get_new_historyUID(conn):
     newHistoryQuery = execute("CALL captions.new_history_uid()", 'get', conn)
@@ -369,171 +368,96 @@ def get_new_deckUID(conn):
         return newImageQuery['result'][0]['new_id']
     return "Could not generate new deck UID", 500
 
+
+# --Email Support -------------------------------------------------------------------------------
+
+
+def sendEmail(name, email, code, subject):
+    print("In sendEmail")
+    with app.app_context():
+        # print("In sendEmail: ", email, code, subject)
+        sender="support@capshnz.com"
+        # print("sender: ", sender)
+        # print("code: ", code)
+
+        message = (
+            f"Hello {name if name else ''}!\n\n"
+            "Here is the Capshnz Code: \n"
+            f"{code}\n"
+            "Have Fun!\n\n"
+            "PS: Please send any game feedback to support@capshnz.com"
+            )
+
+        # print("Body: ", message)
+
+        # subject=f"Capshnz code: {code}",
+
+        msg = Message(
+            subject=f"Capshnz code: {code}",
+            sender = "support@capshnz.com",
+            recipients = [email],
+            body = message
+        )
+        
+        # print("recipients: ", email)
+        # print("Email message: ", msg)
+        mail.send(msg)
+        print("email sent")
+
+
+class SendError(Resource):
+    def __call__(self):
+        print("In SendError")
+
+    def get(self, code1, code2):
+        print("In Send Error get")
+        try:
+            conn = connect()
+            email = 'pmarathay@gmail.com'
+
+            print("code 1", code1)
+            print("code 2", code2)
+        
+            # Send email to Client
+            msg = Message(
+                "Captions Error Code Generated",
+                # sender="support@nityaayurveda.com",
+                # sender="support@mealsfor.me",
+                sender="support@capshnz.com",
+
+                recipients = ["pmarathay@gmail.com", email]
+                
+            )
+            print("past message")
+            print(msg)
+
+            # msg.body = code1
+
+            msg.body = (
+                "Code 1: " + str(code1) + "\n"
+                "Code 2: " + str(code2) + "\n"
+            )
+
+            print("past body")
+            print(msg.body)
+            try: 
+                print(msg)
+                mail.send(msg)
+                print("after mail.send(msg)")
+                
+            except:
+                print("Likely an EMail Credential Issue")
+
+            return "Email Sent", 200
+
+        except:
+            raise BadRequest("Email Request failed, please try again later.")
+        finally:
+            disconnect(conn)
+
+
 # --Caption Queries start here -------------------------------------------------------------------------------
 
-
-# CHECK IF USER EXISTS
-# def checkUser(self, user_name, user_alias, user_email, user_zip):
-#     print("In checkUser")
-#     response = {}
-#     try:
-#         conn = connect()
-#         # print Received data to Terminal
-#         print("In checkUser:", user_name, user_alias, user_email, user_zip)
-
-       
-#         message = "Email Verification Code Sent"
-
-
-#         # CHECK IF EMAIL EXISTS IN DB
-#         check_email = '''
-#                 SELECT * FROM captions.user
-#                 WHERE user_email= \'''' + user_email + '''\'
-#                 '''
-
-#         userinfo = execute(check_email, "get", conn)
-#         print(userinfo, type(userinfo))
-#         print("User Info returned: ", userinfo['result'])
-
-
-#         # CHECK IF USER EXISTS
-#         if userinfo['result'] != ():
-#         # if len(userinfo['result'][0]['user_uid']) > 0:
-#             response["user_uid"] = userinfo['result'][0]['user_uid']
-
-#             # CHECK IF VALIDATION CODE IS TRUE
-#             if userinfo['result'][0]["email_validated"] != "TRUE":
-#                 print("Not Validated")
-#                 response["user_status"] = "User NOT Validated"
-#                 response["user_code"] = userinfo["result"][0]["email_validated"]
-#                 SendEmail.get(self, user_name, user_email, userinfo["result"][0]["email_validated"], message)
-#                 # return response
-
-#             # CHECK IF ZIP CODE IS IN LIST
-#             if user_zip not in userinfo['result'][0]['user_zip_code']:
-#                 print("Zip code not in list")
-#                 response["user_zip"] = "Zip code not in list"
-
-
-#                 query = '''
-#                     UPDATE captions.user
-#                     SET user_zip_code = JSON_ARRAY_APPEND(user_zip_code, '$', \'''' + user_zip + '''\')
-#                     WHERE user_email = \'''' + user_email + '''\';
-#                     '''
-
-#                 addzip = execute(query, "post", conn)
-#                 print("items: ", addzip)
-#                 if addzip["code"] == 281:
-#                     response["user_zip_added"] = "Zip code added"
-
-#             # CHECK IF ALIAS HAS CHANGED
-#             if user_alias != userinfo['result'][0]['user_alias']:
-#                 print("Alias changed")
-#                 response["user_alias"] = "Alias changed"
-
-#                 query = '''
-#                     UPDATE captions.user
-#                     SET user_alias = \'''' + user_alias + '''\'
-#                     WHERE user_email = \'''' + user_email + '''\';
-#                     '''
-
-#                 update_alias = execute(query, "post", conn)
-#                 print("items: ", update_alias)
-#                 if update_alias["code"] == 281:
-#                     response["user_alias_added"] = "Alias updated"
-
-#             # CHECK IF USER NAME HAS CHANGED
-#             if user_name != userinfo['result'][0]['user_name']:
-#                 print("Name changed")
-#                 response["user_name"] = "Name Changed"
-
-#                 query = '''
-#                     UPDATE captions.user
-#                     SET user_name = \'''' + user_name + '''\'
-#                     WHERE user_email = \'''' + user_email + '''\';
-#                     '''
-
-#                 update_name = execute(query, "post", conn)
-#                 print("items: ", update_name)
-#                 if update_name["code"] == 281:
-#                     response["user_name_updated"] = "Name updated"
-
-
-#         # USER DOES NOT EXIST
-#         else:
-#             # Create Validation Code FOR NEW USER
-#             code = str(randint(100,999))
-#             print("Email validation code will be set to: ", code)
-
-#             new_user_uid = get_new_userUID(conn)
-#             print(new_user_uid)
-#             print(getNow())
-
-#             query = '''
-#                 INSERT INTO captions.user
-#                 SET user_uid = \'''' + new_user_uid + '''\',
-#                     user_created_at = \'''' + getNow() + '''\',
-#                     user_name = \'''' + user_name + '''\', 
-#                     user_alias = \'''' + user_alias + '''\', 
-#                     user_email = \'''' + user_email + '''\', 
-#                     user_zip_code = \'''' + user_zip + '''\',
-#                     email_validated = \'''' + code + '''\',
-#                     user_purchases = NULL
-#                 '''
-
-#             items = execute(query, "post", conn)
-#             print("items: ", items)
-#             if items["code"] == 281:
-#                 response["message"] = "Create User successful"
-#                 response["user_uid"] = new_user_uid
-#                 response["email_validated"] = code
-
-#                 # Send Code to User
-#                 SendEmail.get(self, user_name, user_email, code, message)
-
-#             print(response)
-#             return response, 200
-
-
-
-#         print(response)
-#         return response, 200
-
-
-#     except:
-#         raise BadRequest("Create User Request failed")
-#     finally:
-#         disconnect(conn)
-
-
-# class createUser(Resource):
-#     def post(self):
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-#             data = request.get_json(force=True)
-#             # print to Received data to Terminal
-#             print("Received:", data)
-
-
-#             user_name = data["user_name"]
-#             user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
-#             user_email = data["user_email"]
-#             user_zip = data["user_zip"]
-#             # print(user_zip)
-
-
-#             response = checkUser(self, user_name, user_alias, user_email, user_zip)
-#             # print("after CheckEmail call")
-
-#             return response, 200
-
-
-#         except:
-#             raise BadRequest("Create User Request failed")
-#         finally:
-#             disconnect(conn)
 
 class addUserByEmail(Resource):
     def post(self):
@@ -542,7 +466,7 @@ class addUserByEmail(Resource):
         try:
             conn = connect()
             data = request.get_json()
-            email = data["email"]
+            email = data["user_email"]
             query = """SELECT * FROM captions.user
                         WHERE user_email= \'""" + email + """\'
                     """
@@ -554,11 +478,12 @@ class addUserByEmail(Resource):
                 response["alias"] =  user["result"][0]["user_alias"]
                 if user['result'][0]["email_validated"] != "TRUE":
                     response["user_status"] = "User NOT Validated"
-                    SendEmail.get(self, "User", email, 
-                                  user["result"][0]["email_validated"], message)
+                    
+                    sendEmail( user["result"][0]["user_name"], email, user['result'][0]["email_validated"], "User NOT Validated")
             else:
                 code = str(randint(100,999))
                 new_user_uid = get_new_userUID(conn)
+                print("New User Info: ", new_user_uid, code)
                 query = '''
                     INSERT INTO captions.user
                     SET user_uid = \'''' + new_user_uid + '''\',
@@ -572,7 +497,8 @@ class addUserByEmail(Resource):
                     response["message"] = "Create User successful"
                     response["user_uid"] = new_user_uid
                     response["email_validated"] = code
-                    SendEmail.get(self, "User", email, code, message)
+                    
+                    sendEmail( "", email, code, "User NOT Validated")
                 return response, 200
         except Exception as e:
             raise InternalServerError("An unknown error occurred") from e
@@ -580,26 +506,25 @@ class addUserByEmail(Resource):
             disconnect(conn)
         return response, 200
 
+
 class addUser(Resource):
     def post(self):
+        print("In addUser")
         response = {}
         items = {}
         try:
             conn = connect()
             data = request.get_json(force=True)
-            # print to Received data to Terminal
             print("Received:", data)
 
             user_name = data["user_name"]
             user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
             user_email = data["user_email"]
-            # user_zip = data["user_zip"]
-            # print(data)
             message = "Email Verification Code Sent"
+            # user_zip = data["user_zip"]
 
-            # Use statements below if we want to use def
-            # user = CheckEmail(user_email)
-            # print("after CheckEmail call")
+            # print(user_name, user_alias, user_email, message)
+            
 
             # CHECK IF EMAIL EXISTS IN DB
             check_user = '''SELECT * FROM captions.user
@@ -607,11 +532,12 @@ class addUser(Resource):
                             '''
 
             user = execute(check_user, "get", conn)
-            print(user)
+            print("User Info: ", user["result"])
 
 
             # CHECK IF USER EXISTS
             if user['result'] != ():
+                print("User Exists")
             # if len(user['result'][0]['user_uid']) > 0:
                 response["user_uid"] = user['result'][0]['user_uid']
                 response["user_code"] = user["result"][0]["email_validated"]
@@ -619,27 +545,13 @@ class addUser(Resource):
                 # CHECK IF VALIDATION CODE IS TRUE
                 if user['result'][0]["email_validated"] != "TRUE":
                     print("Not Validated")
+                    
+                    sendEmail( user["result"][0]["user_name"], user_email, user["result"][0]["email_validated"], "User NOT Validated")
+
                     response["user_status"] = "User NOT Validated"
-                    SendEmail.get(self, user_name, user_email, user["result"][0]["email_validated"], message)
-                    # return response
+                    
+                    return response
             
-
-                # CHECK IF ZIP CODE IS IN LIST
-                # if user_zip not in user['result'][0]['user_zip_code']:
-                #     print("Zip code not in list")
-                #     response["user_zip"] = "Zip code not in list"
-
-
-                #     query = '''
-                #         UPDATE captions.user
-                #         SET user_zip_code = JSON_ARRAY_APPEND(user_zip_code, '$', \'''' + user_zip + '''\')
-                #         WHERE user_email = \'''' + user_email + '''\';
-                #         '''
-
-                #     addzip = execute(query, "post", conn)
-                #     print("items: ", addzip)
-                #     if addzip["code"] == 281:
-                #         response["user_zip"] = "Zip code added"
 
                 # CHECK IF ALIAS HAS CHANGED
                 if user_alias != user['result'][0]['user_alias']:
@@ -653,7 +565,7 @@ class addUser(Resource):
                         '''
 
                     update_alias = execute(query, "post", conn)
-                    print("items: ", update_alias)
+                    # print("items: ", update_alias)
                     if update_alias["code"] == 281:
                         response["user_alias"] = "Alias updated"
 
@@ -667,9 +579,9 @@ class addUser(Resource):
                         SET user_name = \'''' + user_name + '''\'
                         WHERE user_email = \'''' + user_email + '''\';
                         '''
-
+                    print("uncomment execute command here")
                     update_name = execute(query, "post", conn)
-                    print("items: ", update_name)
+                    # print("items: ", update_name)
                     if update_name["code"] == 281:
                         response["user_name"] = "Name updated"
 
@@ -677,7 +589,7 @@ class addUser(Resource):
             else:
                 # Create Validation Code FOR NEW USER
                 code = str(randint(100,999))
-                print("Email validation code will be set to: ", code)
+                print(f"Email validation code {code} will be set to: {user_email}")
 
                 new_user_uid = get_new_userUID(conn)
                 print(new_user_uid)
@@ -695,14 +607,16 @@ class addUser(Resource):
                     '''
 
                 items = execute(query, "post", conn)
-                print("items: ", items)
+
+                # print("items: ", items)
                 if items["code"] == 281:
                     response["message"] = "Create User successful"
                     response["user_uid"] = new_user_uid
                     response["email_validated"] = code
 
                     # Send Code to User
-                    SendEmail.get(self, user_name, user_email, code, message)
+                    print("\nSending Code to New User")
+                    sendEmail( user_name, user_email, code, message)
 
                 return response, 200
 
@@ -716,7 +630,6 @@ class addUser(Resource):
             raise BadRequest("Create User Request failed")
         finally:
             disconnect(conn)
-
 
 
 class createGame(Resource):
@@ -764,7 +677,6 @@ class createGame(Resource):
             raise BadRequest("Create Game Request failed")
         finally:
             disconnect(conn)
-
 
 
 class joinGame(Resource):
@@ -851,7 +763,6 @@ class joinGame(Resource):
             disconnect(conn)
 
 
-
 class selectDeck(Resource):
     def post(self):
         print("in select deck")
@@ -920,7 +831,6 @@ class assignDeck(Resource):
             disconnect(conn)
 
 
-
 class checkGame(Resource):
     def get(self, game_code):
         print(game_code)
@@ -947,8 +857,6 @@ class checkGame(Resource):
             raise BadRequest("Create Game Request failed")
         finally:
             disconnect(conn)
-
-
 
 
 class getPlayers(Resource):
@@ -1027,7 +935,6 @@ class decks(Resource):
             raise BadRequest("get available decks request failed")
         finally:
             disconnect(conn)
-
 
 
 class gameTimer(Resource):
@@ -1291,46 +1198,6 @@ class getUniqueImageInRound(Resource):
             disconnect(conn)
 
 
-
-# THIS ENDPOINT RETURNS A IMAGE (NOT UNIQUE) FROM UPLOADED IMAGES (NOT FROM A SPECIFIC DECK)
-# class getImageInRound(Resource):
-#     def get(self, game_code, round_number):
-#         print("requested game_code: ", game_code)
-#         print("requested round_number: ", round_number)
-#         response = {}
-#         items = {}
-#         try:
-#             conn = connect()
-#             get_image_query = '''
-#                             SELECT image_uid, image_url FROM captions.image
-#                             ORDER BY RAND()
-#                             LIMIT 1                                  
-#                             '''
-#             image_info = execute(get_image_query, "get", conn)
-
-#             print("image info: ", image_info)
-#             if image_info["code"] == 280:
-#                 response["message1"] = "280, get image request successful."
-#                 response["image_url"] = image_info["result"][0]["image_url"]
-#                 image_uid = image_info["result"][0]["image_uid"]
-#                 #another update round_image query
-#                 write_to_round_query = '''
-#                                     UPDATE captions.round
-#                                     SET round_image_uid=\'''' + image_uid + '''\'
-#                                     WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-#                                     WHERE game_code=\'''' + game_code + '''\')
-#                                     AND round_number = \'''' + round_number + '''\'
-#                                     '''
-#                 updated_round = execute(write_to_round_query, "post", conn)
-#                 print("game_attr_update info: ", updated_round)
-#                 if updated_round["code"] == 281:
-#                     response["message2"] = "281, Round updated."
-#                     return response, 200
-#         except:
-#             raise BadRequest("Get image in round request failed")
-#         finally:
-#             disconnect(conn)
-
 # ENDPOINT IN USE - TEST PRINT STATEMENTS ADDED
 class getImageForPlayers(Resource):
     def get(self, game_code, round_number):
@@ -1470,6 +1337,7 @@ class getRoundImage(Resource):
         finally:
             disconnect(conn)
 
+
 class postRoundImage(Resource):
     def post(self):
         response = {}
@@ -1500,7 +1368,6 @@ class postRoundImage(Resource):
             raise BadRequest("Post image in round request failed")
         finally:
             disconnect(conn)
-
 
 
 class submitCaption(Resource):
@@ -1716,6 +1583,7 @@ class getPlayersWhoHaventVoted(Resource):
             raise BadRequest("Get players who haven't submitted votes request failed")
         finally:
             disconnect(conn)
+
 
 class getScores(Resource):
     def get(self, game_code, round_number):
@@ -2174,7 +2042,6 @@ class createRounds(Resource):
             disconnect(conn)
 
 
-
 class getNextImage(Resource):
     def post(self):
         response = {}
@@ -2204,9 +2071,6 @@ class getNextImage(Resource):
             raise BadRequest("create next round Request failed")
         finally:
             disconnect(conn)
-
-
-
 
 
 class endGame(Resource):
@@ -2265,6 +2129,7 @@ class endGame(Resource):
             raise BadRequest("end game Request failed")
         finally:
             disconnect(conn)
+
 
 class uploadImage(Resource):
     def post(self):
@@ -2343,92 +2208,6 @@ class uploadImage(Resource):
         finally:
             disconnect(conn)
 
-# class CheckEmailValidated(Resource):
-#     def post(self):
-#         response = {}
-#         items = {}
-#         cus_id = {}
-#         try:
-#             conn = connect()
-#             data = request.get_json(force=True)
-#             print("Received:", data)
-
-#             name = data["name"]
-#             email = data["email"]
-#             phone_no = data["phone_no"]
-#             message = data["message"]
-
-#             print("name", name)
-#             print("email", email)
-#             print("phone_no", phone_no)
-#             print("message", message)
-
-
-#             # CHECK THE DATABASE FOR THE EXISTING STATE OF THE EMAIL_VALIDATED COLUMN.
-#             get_verification_code_query = '''
-#                                 SELECT user_uid, email_validated FROM captions.user WHERE user_email=\'''' + email + '''\'
-#                                 '''
-#             validation = execute(get_verification_code_query, "get", conn)
-#             print("validation info: ", validation)
-
-
-#             if len(validation["result"]) == 0:
-#                 print("List is empty --> Please create a new user")
-
-#                 #Roshan caught a bug. :)
-#                 #response[message] = "User does not exist. Please create an account with this email."
-#                 response["message"] = "User does not exist. Please create an account with this email."
-
-#                 return response, 200
-#             else:
-#                 print("first element of list", validation["result"][0])
-
-#             print("User info retrieved --> Checking status of email_validated")
-#             if validation["result"][0]["email_validated"] != 'TRUE':
-#                 code = randint(100,999)
-#                 print("Email validation code will be set to: ", code)
-#                 phone_no += str(code)
-#                 print("Phone #", phone_no)
-#                 user_uid = validation["result"][0]["user_uid"]
-
-#                 #Want to remain in safe mode and change only one row? Use this query!
-#                 set_code_query1 = '''
-#                                             UPDATE captions.user
-#                                             SET email_validated = \'''' + str(code) + '''\' 
-#                                             WHERE user_uid =\'''' + user_uid + '''\' 
-#                                             AND user_email=\'''' + email + '''\'
-#                                             '''
-
-#                 #Want to break some rules and possibly change multiple rows at a time? Use this one.
-#                 set_code_query2 = '''
-#                                 UPDATE captions.user
-#                                 SET email_validated =\'''' + str(code) + '''\'
-#                                 WHERE user_email=\'''' + email + '''\'
-#                                 '''
-#                 #print("valid modified example query\n", set_code_query)
-#                 updateQueryResult = execute(set_code_query2, "post", conn)
-#                 print("Result of update query: ", updateQueryResult["message"])
-
-#             else:
-#                 print("abandon ship")
-#                 response["message"] = "User has already been verified."
-#                 return response, 200
-#                 disconnect(conn)
-
-
-#             SendEmail.get(self, name, email, phone_no, message)  #Temporary comment out for testing purposes
-#             print("send email successful")
-
-#             response["message"] = "Code has been sent to email"
-#             response["result"] = items
-#             return response, 200
-#         except:
-#             raise BadRequest("Check Email Validated Request failed, please try again later.")
-#         finally:
-#             disconnect(conn)
-
-        # ENDPOINT AND JSON OBJECT THAT WORKS
-        # http://localhost:4000/api/v2/createappointment
 
 class CheckEmailValidationCode(Resource):
     def post(self):
@@ -2497,301 +2276,8 @@ class CheckEmailValidationCode(Resource):
         # ENDPOINT AND JSON OBJECT THAT WORKS
         # http://localhost:4000/api/v2/createappointmen
 
-# SEND EMAIL
-class SendEmail(Resource):
-    def __call__(self):
-        print("In SendEmail")
-
-    def get(self, name, email, phone, subject):
-        print("In Send EMail get")
-        try:
-            conn = connect()
-            subject = subject.split(',')
-
-            print("name", name)
-            print("email", email)
-            print("phone", phone)
-            code = phone[-3:]
-            print("code", code)
-            print("subject", subject)
-
-            # month_num = subject[2][5:7]
-            # datetime_object1 = datetime.strptime(month_num, "%m")
-            # month_name = datetime_object1.strftime("%B")
-            #
-            # datetime_object2 = datetime.strptime(subject[2], "%Y-%m-%d")
-            # day = datetime_object2.strftime("%A")
-            #
-            # datetime_object3 = datetime.strptime(subject[3], "%H:%M")
-            # time = datetime_object3.strftime("%I:%M %p")
-            # print(time)
-
-            # phone = phone[0:3] + "-" + phone[3:6] + "-" + phone[6:]
-            print(phone)
-            # Send email to Client
-            msg = Message(
-                "Thanks for your Email!",
-                # sender="support@nityaayurveda.com",
-                # sender="support@mealsfor.me",
-                sender="support@capshnz.com",
-                # recipients=[email],
-                # recipients=[email, "Lmarathay@yahoo.com",
-                #             "pmarathay@gmail.com"],
-
-                #hello9 (does work)
-                # recipients=[email,
-                #             "pmarathay@gmail.com"],
-
-                #hello10 (does work)
-                # recipients=[email,"pmarathay@gmail.com"]
-
-                # hello11 & hello15 (does work also??)
-                # recipients = [email, "pmarathay@gmail.com"],
-
-                # recipients=["mayukh.das@sjsu.edu"]
-                # recipients=["pmarathay@gmail.com"]
-
-                # hello16 (works)
-                # recipients=["pmarathay@gmail.com", "mayukh.das@sjsu.edu"]
-
-                # hello17 ()
-                # recipients = ["pmarathay@gmail.com", "mayukh.das@sjsu.edu", "roshan.nadavi@gmail.com", email]
-
-                recipients = ["pmarathay@gmail.com", email]
-                
-            )
-            print("past message")
-            # msg = Message("Test email", sender='support@mealsfor.me', recipients=["pmarathay@gmail.com"])
-            #some kind of function missing?
-            #another reason: missing the env files?
-            print(msg)
-            # msg.body = code
-            msg.body = subject
-            #msg.body = "hello17"
-            # msg.body = (
-            #     "Hello " + str(name) + "," + "\n"
-            #     "\n"
-            #     "Thank you for making your appointment with us. \n"
-            #     "Here are your  appointment details: \n"
-            #     "Date: " +
-            #     # str(day) + ", " + str(month_name) + " " +
-            #     str(subject[2][8:10]) + ", " + str(subject[2][0:4]) + "\n"
-            #     "Time: " + str(time) + "\n"
-            #     "Location: 6055 Meridian Ave. Suite 40 A, San Jose, CA 95120. \n"
-            #     "\n"
-            #     "Name: " + str(name) + "\n"
-            #     "Phone: " + str(phone) + "\n"
-            #     "Email: " + str(email) + "\n"
-            #     "\n"
-            #     "Package purchased: " + str(subject[0]) + "\n"
-            #     "Total amount paid: " + str(subject[1]) + "\n"
-            #     "\n"
-            #     "If you have any questions please call or text: \n"
-            #     "Leena Marathay at 408-471-7004, \n"
-            #     "Email Leena@nityaayurveda.com \n"
-            #     "\n"
-            #     "Thank you - Nitya Ayurveda\n\n"
-            # )
-            print("past body")
-            print(msg.body)
-            try: 
-                mail.send(msg)
-                print("after mail.send(msg)")
-                print(msg)
-            except:
-                print("Likely an EMail Credential Issue")
-
-            # # print("first email sent")
-            # # Send email to Host
-            # msg = Message(
-            #     "New Email from Website!",
-            #     sender="support@nityaayurveda.com",
-            #     recipients=["Lmarathay@yahoo.com"],
-            # )
-            # msg.body = (
-            #     "Hi !\n\n"
-            #     "You just got an email from your website! \n"
-            #     "Here are the particulars:\n"
-            #     "Name:      " + name + "\n"
-            #     "Email:     " + email + "\n"
-            #     "Phone:     " + phone + "\n"
-            #     "Subject:   " + subject + "\n"
-            # )
-            # "Thx - Nitya Ayurveda\n\n"
-            # # print('msg-bd----', msg.body)
-            # mail.send(msg)
-
-            return "Email Sent", 200
-
-        except:
-            raise BadRequest("Email Request failed, please try again later.")
-        finally:
-            disconnect(conn)
-
-    def post(self):
-
-        try:
-            conn = connect()
-
-            data = request.get_json(force=True)
-            print(data)
-            email = data["email"]
-
-            # msg = Message("Thanks for your Email!", sender='pmarathay@manifestmy.space', recipients=[email])
-            # msg = Message("Thanks for your Email!", sender='info@infiniteoptions.com', recipients=[email])
-            # msg = Message("Thanks for your Email!", sender='leena@nityaayurveda.com', recipients=[email])
-            # msg = Message("Thanks for your Email!", sender='pmarathay@buildsuccess.org', recipients=[email])
-            msg = Message(
-                "Thanks for your Email!",
-                # sender="support@nityaayurveda.com",
-                sender="support@capshnz.com",
-                recipients=[email, "Lmarathay@gmail.com",
-                            "pmarathay@gmail.com"],
-            )
-            # msg = Message("Test email", sender='support@mealsfor.me', recipients=["pmarathay@gmail.com"])
-            msg.body = (
-                "Hi !\n\n"
-                "We are looking forward to meeting with you! \n"
-                "Email support@capshnz.com if you need to get in touch with us directly.\n"
-                "Thx - Capshnz Team\n\n"
-            )
-            # print('msg-bd----', msg.body)
-            # print('msg-')
-            mail.send(msg)
-
-            # Send email to Host
-            # msg = Message("Email Verification", sender='support@mealsfor.me', recipients=[email])
-
-            # print('MESSAGE----', msg)
-            # print('message complete')
-            # # print("1")
-            # link = url_for('confirm', token=token, hashed=password, _external=True)
-            # # print("2")
-            # print('link---', link)
-            # msg.body = "Click on the link {} to verify your email address.".format(link)
-            # print('msg-bd----', msg.body)
-            # mail.send(msg)
-            return "Email Sent", 200
-
-        except:
-            raise BadRequest("Request failed, please try again later.")
-        finally:
-            disconnect(conn)
 
 
-# SEND EMAIL
-class SendError(Resource):
-    def __call__(self):
-        print("In SendError")
-
-    def get(self, code1, code2):
-        print("In Send Error get")
-        try:
-            conn = connect()
-            email = 'aditya.baravkar09@gmail.com', 'ishankanungo123@gmail.com'
-
-            print("code 1", code1)
-            print("code 2", code2)
-        
-            # Send email to Client
-            msg = Message(
-                "Captions Error Code Generated",
-                # sender="support@nityaayurveda.com",
-                # sender="support@mealsfor.me",
-                sender="support@capshnz.com",
-
-                recipients = ["pmarathay@gmail.com", email]
-                
-            )
-            print("past message")
-            print(msg)
-
-            # msg.body = code1
-
-            msg.body = (
-                "Code 1: " + str(code1) + "\n"
-                "Code 2: " + str(code2) + "\n"
-            )
-            #msg.body = "hello17"
-            # msg.body = (
-            #     "Hello " + str(name) + "," + "\n"
-            #     "\n"
-            #     "Thank you for making your appointment with us. \n"
-            #     "Here are your  appointment details: \n"
-            #     "Date: " +
-            #     # str(day) + ", " + str(month_name) + " " +
-            #     str(subject[2][8:10]) + ", " + str(subject[2][0:4]) + "\n"
-            #     "Time: " + str(time) + "\n"
-            #     "Location: 6055 Meridian Ave. Suite 40 A, San Jose, CA 95120. \n"
-            #     "\n"
-            #     "Name: " + str(name) + "\n"
-            #     "Phone: " + str(phone) + "\n"
-            #     "Email: " + str(email) + "\n"
-            #     "\n"
-            #     "Package purchased: " + str(subject[0]) + "\n"
-            #     "Total amount paid: " + str(subject[1]) + "\n"
-            #     "\n"
-            #     "If you have any questions please call or text: \n"
-            #     "Leena Marathay at 408-471-7004, \n"
-            #     "Email Leena@nityaayurveda.com \n"
-            #     "\n"
-            #     "Thank you - Nitya Ayurveda\n\n"
-            # )
-            print("past body")
-            print(msg.body)
-            try: 
-                mail.send(msg)
-                print("after mail.send(msg)")
-                print(msg)
-            except:
-                print("Likely an EMail Credential Issue")
-
-            # # print("first email sent")
-            # # Send email to Host
-            # msg = Message(
-            #     "New Email from Website!",
-            #     sender="support@nityaayurveda.com",
-            #     recipients=["Lmarathay@yahoo.com"],
-            # )
-            # msg.body = (
-            #     "Hi !\n\n"
-            #     "You just got an email from your website! \n"
-            #     "Here are the particulars:\n"
-            #     "Name:      " + name + "\n"
-            #     "Email:     " + email + "\n"
-            #     "Phone:     " + phone + "\n"
-            #     "Subject:   " + subject + "\n"
-            # )
-            # "Thx - Nitya Ayurveda\n\n"
-            # # print('msg-bd----', msg.body)
-            # mail.send(msg)
-
-            return "Email Sent", 200
-
-        except:
-            raise BadRequest("Email Request failed, please try again later.")
-        finally:
-            disconnect(conn)
-
-
-
-
-#Wow! This is my first customized endpoint. More than happy that it actually works :).
-class goaway(Resource):
-    def get(self):
-        print("go away requested")
-        response = {}
-        items = {}
-        try:
-            conn = connect()
-            print("connection established")
-
-            response["message"] = "i told you to go away"
-            return response, 200
-        except:
-            raise BadRequest("Go Away Request Failed :(")
-        finally:
-            disconnect(conn)
 
 class testHarvard(Resource):
     def get(self):
@@ -2836,6 +2322,7 @@ class testHarvard(Resource):
             raise BadRequest("Harvard Request Failed :(")
         finally:
             disconnect(conn)
+
 
 class addFeedback(Resource):
     def post(self):
@@ -2902,6 +2389,7 @@ class summary(Resource):
         finally:
             disconnect(conn)
         return response, 200
+
 
 class summaryEmail(Resource):
     def post(self):
@@ -3037,9 +2525,6 @@ api.add_resource(getImageForPlayers, "/api/v2/getImageForPlayers/<string:game_co
 api.add_resource(endGame, "/api/v2/endGame/<string:game_code>")
 api.add_resource(getUniqueImageInRound, "/api/v2/getUniqueImageInRound/<string:game_code>,<string:round_number>")
 api.add_resource(uploadImage, "/api/v2/uploadImage")
-api.add_resource(goaway, "/api/v2/goaway")
-# api.add_resource(SendEmail, "/api/v2/sendEmail")
-api.add_resource(SendEmail, "/api/v2/sendEmail/<string:name>,<string:email>,<string:phone>,<string:subject>")
 api.add_resource(SendError, "/api/v2/sendError/<string:code1>*<string:code2>")
 # api.add_resource(CheckEmailValidated, "/api/v2/checkEmailValidated")
 api.add_resource(CheckEmailValidationCode, "/api/v2/checkEmailValidationCode")
