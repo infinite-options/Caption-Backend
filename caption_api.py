@@ -104,8 +104,8 @@ app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
 
 #This should not be on Github -- should work on localhost
 # app.config['MAIL_USERNAME'] = "support@mealsfor..."
-# app.config['MAIL_USERNAME'] = "support@capshnz..."
-# app.config['MAIL_PASSWORD'] = "Support..."
+app.config['MAIL_USERNAME'] = "support@capshnz.com"
+app.config['MAIL_PASSWORD'] = "Supportcapshnz1!"
 
 
 # Setting for mydomain.com
@@ -547,7 +547,7 @@ class addUser(Resource):
 
                     response["user_status"] = "User NOT Validated"
                     
-                    return response
+                    # return response
             
 
                 # CHECK IF ALIAS HAS CHANGED
@@ -624,7 +624,7 @@ class addUser(Resource):
 
 
         except:
-            raise BadRequest("Create User Request failed")
+            raise BadRequest("Create User Request failed. If running on local host make sure your have the MAIL_USERNAME and MAIL_PASSWORD")
         finally:
             disconnect(conn)
 
