@@ -2390,11 +2390,38 @@ class summary(Resource):
 
 class summaryEmail(Resource):
     def post(self):
+        print("In Summary Email")
         try:
             conn = connect()
+            response = {}
             data = request.get_json()
+            print("Data Received: ", data)
             game_uid = data["gameUID"]
             host_email = data["email"]
+            recipients = [host_email, 'pmarathay@yahoo.com']
+
+
+            # Get participant emails
+            emailQuery = '''
+                    SELECT -- *
+                        DISTINCT round_game_uid, round_user_uid, user_name, user_email
+                    FROM captions.round
+                    LEFT JOIN captions.user ON round_user_uid = user_uid
+                    -- WHERE round_game_uid = "200-004165"
+                    WHERE round_game_uid = \'''' + game_uid + '''\'
+                    '''
+            emails = execute(emailQuery, "get", conn)["result"]
+            print(emails)
+
+            # Extract emails, add to recipients, ensure uniqueness, and format as a list
+            recipients = list(set(recipients + [player['user_email'] for player in emails]))
+
+            # Print the final list
+            print(recipients)
+
+
+
+            # Get Game Images and Winning Captions
             query = '''
                     SELECT r1.*
                     FROM captions.round r1
@@ -2428,6 +2455,7 @@ class summaryEmail(Resource):
                     </div>
                 """
                 round_number_set.add(caption["round_number"])
+
             msg_html = """
                 <!DOCTYPE html>
                 <html>
@@ -2439,17 +2467,31 @@ class summaryEmail(Resource):
                     </body>
                 </html>
             """
+
+            # Send Email
             msg = Message(
                 "Capshnz summary",
                 sender = "support@capshnz.com",
-                recipients = [host_email],
+                # recipients = [host_email,'pmarathay@yahoo.com'],
+                recipients = recipients,
                 html = msg_html
             )
+            # print("message: ", msg)
+
             mail.send(msg)
+            response["Confrimation"] = 'email sent'
+            response["Recipients"] = recipients
+
         except Exception as e:
+            response["Confrimation"] = 'email failure'
+            print(recipients)
+            response["Recipients"] = recipients
             raise InternalServerError("An unknown error occurred") from e
         finally:
             disconnect(conn)
+
+        return response, 200
+
 
 
 class CNNWebScrape(Resource):
