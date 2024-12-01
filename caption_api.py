@@ -104,8 +104,8 @@ app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
 
 #This should not be on Github -- should work on localhost
 # app.config['MAIL_USERNAME'] = "support@mealsfor..."
-app.config['MAIL_USERNAME'] = "support@capshnz.com"
-app.config['MAIL_PASSWORD'] = "Supportcapshnz1!"
+# app.config['MAIL_USERNAME'] = ""
+# app.config['MAIL_PASSWORD'] = ""
 
 
 # Setting for mydomain.com
