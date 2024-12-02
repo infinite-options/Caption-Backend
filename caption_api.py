@@ -2579,4 +2579,4 @@ api.add_resource(CNNWebScrape , "/api/v2/cnn_webscrape")
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=4000)
+    app.run(host="127.0.0.1", port=4030)
