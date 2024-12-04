@@ -1,0 +1,63 @@
+name: Capshnz CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Clone Repository
+        run: |
+          git clone https://github.com/infinite-options/Caption-Backend.git
+          cd Caption-Backend
+          ls
+      
+      - name: Set Up Python
+        run: |
+          sudo apt update
+          sudo apt install -y python3 python3-pip
+          python3 --version
+      
+      - name: Install Dependencies
+        run: |
+          cd Caption-Backend
+          pip3 install -r req.txt
+
+      - name: Run app to test
+        id: test
+        run: |
+          cd Caption-Backend
+          python3 caption_api.py &
+          sleep 10
+          if ! pgrep -f "python3 caption_api.py"; then
+            echo "App failed to start"
+            exit 1
+          fi
+      
+      - name: Deploy to EC2
+        if: success()
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER}}
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          echo "${SSH_PRIVATE_KEY}" > ssh_key.pem
+          chmod 600 ssh_key.pem
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem $EC2_USER@$EC2_HOST << EOF
+            echo "Connected to EC2 instance"
+            cd /home/ec2-user/capshnz
+            source .venv/bin/activate
+            cd Caption-Backend
+            echo "Pulling latest code..."
+            git pull origin master
+            echo "Restarting application..."
+            pkill -f "python3 caption_api.py" || echo "No existing app running"
+            nohup python3 caption_api.py >> caption.log 2>&1 &
+            echo "Application started"
+            exit 0
+          EOF
