@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - ss_1203
 
 jobs:
   test-and-deploy:
@@ -26,7 +27,7 @@ jobs:
       - name: Install Dependencies
         run: |
           cd Caption-Backend
-          pip3 install -r req.txt
+          pip3 install -r requirements.txt
 
       - name: Run app to test
         id: test
