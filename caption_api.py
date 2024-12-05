@@ -61,18 +61,20 @@ import json
 import pytz
 import pymysql
 import requests
+from dotenv import load_dotenv
+load_dotenv()
 
 from random import randint
 
-# RDS_HOST = "io-mysqldb8.cxjnrciilyjq.us-west-1.rds.amazonaws.com"
-# RDS_PORT = 3306
-# RDS_USER = "admin"
-# RDS_DB = "captions"
+RDS_HOST = "io-mysqldb8.cxjnrciilyjq.us-west-1.rds.amazonaws.com"
+RDS_PORT = 3306
+RDS_USER = "admin"
+RDS_DB = "captions"
 
-RDS_HOST = os.environ.get("RDS_HOST")
-RDS_PORT = os.environ.get("RDS_PORT")
-RDS_USER = os.environ.get("RDS_USER")
-RDS_DB = os.environ.get("RDS_DB")
+# RDS_HOST = os.getenv("RDS_HOST")
+# RDS_PORT = os.getenv("RDS_PORT")
+# RDS_USER = os.getenv("RDS_USER")
+# RDS_DB = os.getenv("RDS_DB")
 
 
 
@@ -84,17 +86,17 @@ app = Flask(__name__, template_folder="assets")
 import stripe
 
 # STRIPE AND PAYPAL KEYS
-paypal_secret_test_key = os.environ.get('paypal_secret_key_test')
-paypal_secret_live_key = os.environ.get('paypal_secret_key_live')
+paypal_secret_test_key = os.getenv('paypal_secret_key_test')
+paypal_secret_live_key = os.getenv('paypal_secret_key_live')
 
-paypal_client_test_key = os.environ.get('paypal_client_test_key')
-paypal_client_live_key = os.environ.get('paypal_client_live_key')
+paypal_client_test_key = os.getenv('paypal_client_test_key')
+paypal_client_live_key = os.getenv('paypal_client_live_key')
 
-stripe_public_test_key = os.environ.get('stripe_public_test_key')
-stripe_secret_test_key = os.environ.get('stripe_secret_test_key')
+stripe_public_test_key = os.getenv('stripe_public_test_key')
+stripe_secret_test_key = os.getenv('stripe_secret_test_key')
 
-stripe_public_live_key = os.environ.get('stripe_public_live_key')
-stripe_secret_live_key = os.environ.get('stripe_secret_live_key')
+stripe_public_live_key = os.getenv('stripe_public_live_key')
+stripe_secret_live_key = os.getenv('stripe_secret_live_key')
 
 stripe.api_key = stripe_secret_test_key
 
@@ -106,13 +108,17 @@ CORS(app)
 
 # --------------- Mail Variables ------------------
 #This should be on Github -- should work wth environmental variables
-app.config["MAIL_USERNAME"] = os.environ.get("SUPPORT_EMAIL")
-app.config["MAIL_PASSWORD"] = os.environ.get("SUPPORT_PASSWORD")
+app.config["MAIL_USERNAME"] = os.getenv("SUPPORT_EMAIL")
+app.config["MAIL_PASSWORD"] = os.getenv("SUPPORT_PASSWORD")
+print("Backend Running")
+# print(os.getenv("SUPPORT_EMAIL"))
+# print(os.getenv("RDS_DB"))
 
 #This should not be on Github -- should work on localhost
 # app.config['MAIL_USERNAME'] = "support@mealsfor..."
-# app.config['MAIL_USERNAME'] = ""
-# app.config['MAIL_PASSWORD'] = ""
+# app.config['MAIL_USERNAME'] = "support@capshnz.com"
+# app.config['MAIL_PASSWORD'] = "Supportcapshnz1!"
+
 
 
 # Setting for mydomain.com
@@ -130,7 +136,7 @@ app.config["MAIL_USE_SSL"] = True
 # app.config['DEBUG'] = True
 app.config["DEBUG"] = False
 
-app.config["STRIPE_SECRET_KEY"] = os.environ.get("STRIPE_SECRET_KEY")
+app.config["STRIPE_SECRET_KEY"] = os.getenv("STRIPE_SECRET_KEY")
 
 mail = Mail(app)
 
@@ -178,7 +184,7 @@ s3_res = boto3.resource('s3')
 s3_cl = boto3.client('s3')
 
 # aws s3 bucket where the image is stored
-# BUCKET_NAME = os.environ.get('MEAL_IMAGES_BUCKET')
+# BUCKET_NAME = os.getenv('MEAL_IMAGES_BUCKET')
 BUCKET_NAME = 'iocaptions'
 # allowed extensions for uploading a profile photo file
 ALLOWED_EXTENSIONS = set(["png", "jpg", "jpeg"])
@@ -208,11 +214,11 @@ def helper_upload_user_img(file, key):
 
 # For Push notification
 isDebug = False
-NOTIFICATION_HUB_KEY = os.environ.get("NOTIFICATION_HUB_KEY")
-NOTIFICATION_HUB_NAME = os.environ.get("NOTIFICATION_HUB_NAME")
+NOTIFICATION_HUB_KEY = os.getenv("NOTIFICATION_HUB_KEY")
+NOTIFICATION_HUB_NAME = os.getenv("NOTIFICATION_HUB_NAME")
 
-TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 
 
 # Connect to MySQL database (API v2)
@@ -505,7 +511,7 @@ class addUserByEmail(Resource):
                     sendEmail( "", email, code, "User NOT Validated")
                 return response, 200
         except Exception as e:
-            raise InternalServerError("An unknown error occurred") from e
+            raise InternalServerError("An unknown error occurred. If running locally, check email credentials") from e
         finally:
             disconnect(conn)
         return response, 200
