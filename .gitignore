@@ -18,6 +18,7 @@ zappa*
 .log
 .vscode
 .idea
+.env
 
 
 # py files

@@ -64,10 +64,17 @@ import requests
 
 from random import randint
 
-RDS_HOST = "io-mysqldb8.cxjnrciilyjq.us-west-1.rds.amazonaws.com"
-RDS_PORT = 3306
-RDS_USER = "admin"
-RDS_DB = "captions"
+# RDS_HOST = "io-mysqldb8.cxjnrciilyjq.us-west-1.rds.amazonaws.com"
+# RDS_PORT = 3306
+# RDS_USER = "admin"
+# RDS_DB = "captions"
+
+RDS_HOST = os.environ.get("RDS_HOST")
+RDS_PORT = os.environ.get("RDS_PORT")
+RDS_USER = os.environ.get("RDS_USER")
+RDS_DB = os.environ.get("RDS_DB")
+
+
 
 # app = Flask(__name__)
 app = Flask(__name__, template_folder="assets")
