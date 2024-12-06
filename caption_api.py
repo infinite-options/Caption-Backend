@@ -1597,6 +1597,7 @@ class getPlayersWhoHaventVoted(Resource):
 
 class getScores(Resource):
     def get(self, game_code, round_number):
+        print("In getScores")
         # print("requested game_code: ", game_code)
         # response = {}
         # items = {}
@@ -1628,6 +1629,7 @@ class getScores(Resource):
         response = {}
         items = {}
         try:
+            print("In Try")
             conn = connect()
             get_game_score = '''
                             SELECT round_user_uid, SUM(score) as game_score FROM captions.round
@@ -1636,7 +1638,7 @@ class getScores(Resource):
                             GROUP BY round_user_uid
                             '''
             game_score = execute(get_game_score, "get", conn)
-            # print("game_score_info:", game_score)
+            print("game_score_info:", game_score)
             if game_score["code"] == 280:
                 get_score_query = '''
                                 SELECT captions.round.round_user_uid, captions.user.user_alias,
@@ -1649,7 +1651,7 @@ class getScores(Resource):
                                 AND round_number=\'''' + round_number + '''\'
                                 '''
                 scoreboard = execute(get_score_query, "get", conn)
-                # print("score info: ", scoreboard)
+                print("score info: ", scoreboard)
                 if scoreboard["code"] == 280:
                     response["message"] = "280, scoreboard is updated and get_score_board request " \
                                           "successful."
@@ -1662,6 +1664,7 @@ class getScores(Resource):
                     response["scoreboard"] = scoreboard["result"]
                     return response, 200
         except:
+            print("In except")
             raise BadRequest("Get scoreboard request failed")
         finally:
             disconnect(conn)
