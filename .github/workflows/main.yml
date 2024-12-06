@@ -10,23 +10,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Clone Repository
         run: |
           git clone https://github.com/infinite-options/Caption-Backend.git
           cd Caption-Backend
           ls
-      
+
       - name: Set Up Python
         run: |
           sudo apt update
           sudo apt install -y python3 python3-pip
           python3 --version
-      
+
       - name: Install Dependencies
         run: |
           cd Caption-Backend
-          pip3 install -r req.txt
+          pip3 install -r requirements.txt
 
       - name: Run app to test
         id: test
@@ -38,7 +37,7 @@ jobs:
             echo "App failed to start"
             exit 1
           fi
-      
+
       - name: Deploy to EC2
         if: success()
         env:
