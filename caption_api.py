@@ -1671,6 +1671,7 @@ class getScores(Resource):
 
 
 class getScoreBoard(Resource):
+    print("in getScoreBoard")
     def get(self, game_code, round_number):
         # print("requested game_code: ", game_code)
         # print("requested round_number:", round_number)
