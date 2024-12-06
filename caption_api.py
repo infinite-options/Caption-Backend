@@ -110,7 +110,7 @@ CORS(app)
 #This should be on Github -- should work wth environmental variables
 app.config["MAIL_USERNAME"] = os.getenv("SUPPORT_EMAIL")
 app.config["MAIL_PASSWORD"] = os.getenv("SUPPORT_PASSWORD")
-print("Backend Running")
+# print("Backend Running")
 # print(os.getenv("SUPPORT_EMAIL"))
 # print(os.getenv("RDS_DB"))
 
@@ -194,7 +194,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def helper_upload_user_img(file, key):
-    print("uploading image to s3 bucket.")
+    # print("uploading image to s3 bucket.")
     bucket = 'iocaptions'
     if file and allowed_file(file.filename):
         # filename = 'https://' + bucket+ '.s3.us-west-1.amazonaws.com/' \
@@ -229,7 +229,7 @@ def connect():
     global RDS_USER
     global RDS_DB
 
-    print("Trying to connect to RDS (API v2)...")
+    # print("Trying to connect to RDS (API v2)...")
     try:
         conn = pymysql.connect(
             host=RDS_HOST,
@@ -239,10 +239,10 @@ def connect():
             db=RDS_DB,
             cursorclass=pymysql.cursors.DictCursor,
         )
-        print("Successfully connected to RDS. (API v2)")
+        # print("Successfully connected to RDS. (API v2)")
         return conn
     except:
-        print("Could not connect to RDS. (API v2)")
+        # print("Could not connect to RDS. (API v2)")
         raise Exception("RDS Connection failed. (API v2)")
 
 
@@ -250,9 +250,9 @@ def connect():
 def disconnect(conn):
     try:
         conn.close()
-        print("Successfully disconnected from MySQL database. (API v2)")
+        # print("Successfully disconnected from MySQL database. (API v2)")
     except:
-        print("Could not properly disconnect from MySQL database. (API v2)")
+        # print("Could not properly disconnect from MySQL database. (API v2)")
         raise Exception("Failure disconnecting from MySQL database. (API v2)")
 
 
@@ -278,7 +278,7 @@ def serializeResponse(response):
 # OPTIONAL: Set skipSerialization to True to skip default JSON response serialization
 def execute(sql, cmd, conn, skipSerialization=False):
     response = {}
-    print("in Execute", cmd)
+    # print("in Execute", cmd)
     try:
         with conn.cursor() as cur:
             # print("before query")
@@ -317,7 +317,7 @@ def closeRdsConn(cur, conn):
     try:
         cur.close()
         conn.close()
-        print("Successfully closed RDS connection.")
+        # print("Successfully closed RDS connection.")
     except:
         print("Could not close RDS connection.")
 
@@ -383,7 +383,7 @@ def get_new_deckUID(conn):
 
 
 def sendEmail(name, email, code, subject):
-    print("In sendEmail")
+    # print("In sendEmail")
     with app.app_context():
         # print("In sendEmail: ", email, code, subject)
         sender="support@capshnz.com"
@@ -412,7 +412,7 @@ def sendEmail(name, email, code, subject):
         # print("recipients: ", email)
         # print("Email message: ", msg)
         mail.send(msg)
-        print("email sent")
+        # print("email sent")
 
 
 class SendError(Resource):
@@ -420,13 +420,13 @@ class SendError(Resource):
         print("In SendError")
 
     def get(self, code1, code2):
-        print("In Send Error get")
+        # print("In Send Error get")
         try:
             conn = connect()
             email = 'pmarathay@gmail.com'
 
-            print("code 1", code1)
-            print("code 2", code2)
+            # print("code 1", code1)
+            # print("code 2", code2)
         
             # Send email to Client
             msg = Message(
@@ -438,8 +438,8 @@ class SendError(Resource):
                 recipients = ["pmarathay@gmail.com", email]
                 
             )
-            print("past message")
-            print(msg)
+            # print("past message")
+            # print(msg)
 
             # msg.body = code1
 
@@ -448,12 +448,12 @@ class SendError(Resource):
                 "Code 2: " + str(code2) + "\n"
             )
 
-            print("past body")
-            print(msg.body)
+            # print("past body")
+            # print(msg.body)
             try: 
-                print(msg)
+                # print(msg)
                 mail.send(msg)
-                print("after mail.send(msg)")
+                # print("after mail.send(msg)")
                 
             except:
                 print("Likely an EMail Credential Issue")
@@ -493,7 +493,7 @@ class addUserByEmail(Resource):
             else:
                 code = str(randint(100,999))
                 new_user_uid = get_new_userUID(conn)
-                print("New User Info: ", new_user_uid, code)
+                # print("New User Info: ", new_user_uid, code)
                 query = '''
                     INSERT INTO captions.user
                     SET user_uid = \'''' + new_user_uid + '''\',
@@ -519,13 +519,13 @@ class addUserByEmail(Resource):
 
 class addUser(Resource):
     def post(self):
-        print("In addUser")
+        # print("In addUser")
         response = {}
         items = {}
         try:
             conn = connect()
             data = request.get_json(force=True)
-            print("Received:", data)
+            # print("Received:", data)
 
             user_name = data["user_name"]
             user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
@@ -542,19 +542,19 @@ class addUser(Resource):
                             '''
 
             user = execute(check_user, "get", conn)
-            print("User Info: ", user["result"])
+            # print("User Info: ", user["result"])
 
 
             # CHECK IF USER EXISTS
             if user['result'] != ():
-                print("User Exists")
+                # print("User Exists")
             # if len(user['result'][0]['user_uid']) > 0:
                 response["user_uid"] = user['result'][0]['user_uid']
                 response["user_code"] = user["result"][0]["email_validated"]
 
                 # CHECK IF VALIDATION CODE IS TRUE
                 if user['result'][0]["email_validated"] != "TRUE":
-                    print("Not Validated")
+                    # print("Not Validated")
                     
                     sendEmail( user["result"][0]["user_name"], user_email, user["result"][0]["email_validated"], "User NOT Validated")
 
@@ -565,7 +565,7 @@ class addUser(Resource):
 
                 # CHECK IF ALIAS HAS CHANGED
                 if user_alias != user['result'][0]['user_alias']:
-                    print("Alias changed")
+                    # print("Alias changed")
                     response["user_alias"] = "Alias changed"
 
                     query = '''
@@ -581,7 +581,7 @@ class addUser(Resource):
 
                 # CHECK IF USER NAME HAS CHANGED
                 if user_name != user['result'][0]['user_name']:
-                    print("Name changed")
+                    # print("Name changed")
                     response["user_name"] = "Name Changed"
 
                     query = '''
@@ -589,7 +589,7 @@ class addUser(Resource):
                         SET user_name = \'''' + user_name + '''\'
                         WHERE user_email = \'''' + user_email + '''\';
                         '''
-                    print("uncomment execute command here")
+                    # print("uncomment execute command here")
                     update_name = execute(query, "post", conn)
                     # print("items: ", update_name)
                     if update_name["code"] == 281:
@@ -599,11 +599,11 @@ class addUser(Resource):
             else:
                 # Create Validation Code FOR NEW USER
                 code = str(randint(100,999))
-                print(f"Email validation code {code} will be set to: {user_email}")
+                # print(f"Email validation code {code} will be set to: {user_email}")
 
                 new_user_uid = get_new_userUID(conn)
-                print(new_user_uid)
-                print(getNow())
+                # print(new_user_uid)
+                # print(getNow())
 
                 query = '''
                     INSERT INTO captions.user
@@ -625,7 +625,7 @@ class addUser(Resource):
                     response["email_validated"] = code
 
                     # Send Code to User
-                    print("\nSending Code to New User")
+                    # print("\nSending Code to New User")
                     sendEmail( user_name, user_email, code, message)
 
                 return response, 200
@@ -650,20 +650,20 @@ class createGame(Resource):
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
 
             user_uid = data["user_uid"]
             num_rounds = data["rounds"]
             time_limit = data["round_time"]
             scoring = data["scoring_scheme"]
-            print(user_uid)
+            # print(user_uid)
 
             new_game_uid = get_new_gameUID(conn)
-            print(new_game_uid)
-            print(getNow())
+            # print(new_game_uid)
+            # print(getNow())
 
             game_code = random.randint(10000000, 99999999)
-            print(game_code)
+            # print(game_code)
 
             query = '''
                 INSERT INTO captions.game
@@ -677,7 +677,7 @@ class createGame(Resource):
                 '''
 
             items = execute(query, "post", conn)
-            print("items: ", items)
+            # print("items: ", items)
             if items["code"] == 281:
                 response["message"] = "Create Game successful"
                 response["game_code"] = str(game_code)
@@ -691,7 +691,7 @@ class createGame(Resource):
 
 class joinGame(Resource):
     def post(self):
-        print("In joinGame")
+        # print("In joinGame")
         response = {}
         returning_user = {}
         new_user = {}
@@ -700,7 +700,7 @@ class joinGame(Resource):
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
 
             # player data
             user_uid = data["user_uid"]
@@ -712,14 +712,14 @@ class joinGame(Resource):
                                     WHERE game_code=\'''' + game_code + '''\'
                                     '''
             game_info = execute(check_game_code_query, "get", conn)
-            print(game_info)
+            # print(game_info)
             if game_info["code"] == 280 and len(game_info["result"]) == 1:
                 game_uid = game_info["result"][0]["game_uid"]
-                print(game_uid)
+                # print(game_uid)
                 response["num_rounds"] = game_info["result"][0]["num_rounds"]
-                print(game_info["result"][0]["num_rounds"])
+                # print(game_info["result"][0]["num_rounds"])
                 response["round_duration"] = game_info["result"][0]["time_limit"]
-                print(game_info["result"][0]["time_limit"])
+                # print(game_info["result"][0]["time_limit"])
 
 
                 # Check if user is already in the game
@@ -730,7 +730,7 @@ class joinGame(Resource):
                                             '''
 
                 existing_player = execute(check_user_in_game_query, "get", conn)
-                print("player_info: ", existing_player)
+                # print("player_info: ", existing_player)
                 
                 if existing_player["code"] == 280 and existing_player["result"] != ():
                         response["message"] = "280, Player has already joined the game."
@@ -739,7 +739,7 @@ class joinGame(Resource):
 
                 else:
                     # User has entered and existing game code and is not in the game
-                    print("in else clause")
+                    # print("in else clause")
                     new_round_uid = get_new_roundUID(conn)
                     add_user_to_round_query = '''
                                             INSERT INTO captions.round
@@ -755,7 +755,7 @@ class joinGame(Resource):
                                             round_started_at = NULL'''
 
                     add_user = execute(add_user_to_round_query, "post", conn)
-                    print("add_user_response: ", add_user)
+                    # print("add_user_response: ", add_user)
                     if add_user["code"] == 281:
                         response["message"] = "Player added to the game."
                         response["game_uid"] = game_uid
@@ -775,14 +775,14 @@ class joinGame(Resource):
 
 class selectDeck(Resource):
     def post(self):
-        print("in select deck")
+        # print("in select deck")
         response = {}
         items = {}
         try:
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
             deck_uid = data["deck_uid"]
             game_code = data["game_code"]
 
@@ -793,7 +793,7 @@ class selectDeck(Resource):
                                 '''
 
             selected_deck = execute(select_deck_query, "post", conn)
-            print("selected deck info: ", selected_deck)
+            # print("selected deck info: ", selected_deck)
 
             if selected_deck["code"] == 281:
                 response["message"] = "281, Deck successfully submitted."
@@ -813,7 +813,7 @@ class assignDeck(Resource):
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
             deck_uid = data["deck_uid"]
             game_code = data["game_code"]
 
@@ -829,7 +829,7 @@ class assignDeck(Resource):
                                 '''
 
             assign_deck = execute(assign_deck_query, "post", conn)
-            print("selected deck info: ", assign_deck)
+            # print("selected deck info: ", assign_deck)
 
             if assign_deck["code"] == 281:
                 response["message"] = "281, Deck assigned successfully."
@@ -843,7 +843,7 @@ class assignDeck(Resource):
 
 class checkGame(Resource):
     def get(self, game_code):
-        print(game_code)
+        # print(game_code)
         response = {}
         items = {}
         try:
@@ -854,7 +854,7 @@ class checkGame(Resource):
                 WHERE game_code = \'''' + game_code + '''\';
                 '''
             items = execute(query, "get", conn)
-            print("items: ", items)
+            # print("items: ", items)
 
             if items["code"] == 280:
                 response["message"] = "280, Check Game successful"
@@ -871,7 +871,7 @@ class checkGame(Resource):
 
 class getPlayers(Resource):
     def get(self, game_code):
-        print("requested game_uid: ", game_code)
+        # print("requested game_uid: ", game_code)
         response = {}
         items = {}
         try:
@@ -884,7 +884,7 @@ class getPlayers(Resource):
                                 WHERE game_code=\'''' + game_code + '''\') AND user.email_validated = "TRUE"
                                 '''
             players = execute(get_players_query, "get", conn)
-            print("players info: ", players)
+            # print("players info: ", players)
             if players["code"] == 280:
                 response["message"] = "280, Get players request successful."
                 response["players_list"] = players["result"]
@@ -897,8 +897,8 @@ class getPlayers(Resource):
 
 class decks(Resource):
     def get(self, user_uid, public_decks):
-        print(user_uid)
-        print(public_decks)
+        # print(user_uid)
+        # print(public_decks)
         response = {}
         try:
             conn = connect()
@@ -935,7 +935,7 @@ class decks(Resource):
             else:
                 decks = execute(get_all_decks_query2, "get", conn)
             #decks = execute(get_all_decks_query2, "get", conn)
-            print("players info: ", decks)
+            # print("players info: ", decks)
             if decks["code"] == 280:
                 response["message"] = "280, get available decks request successful."
                 response["decks_info"] = decks["result"]
@@ -949,7 +949,7 @@ class decks(Resource):
 
 class gameTimer(Resource):
     def get(self, game_code, round_number):
-        print("requested game_uid: ", game_code)
+        # print("requested game_uid: ", game_code)
         response = {}
         items = {}
         try:
@@ -967,7 +967,7 @@ class gameTimer(Resource):
                                 '''
             timer = execute(get_game_timer_info, "get", conn)
 
-            print("timer info: ", timer)
+            # print("timer info: ", timer)
             if timer["code"] == 280:
                 response["message"] = "280, Timer information request successful."
                 response["current_time"] = current_time
@@ -991,7 +991,7 @@ class changeRoundsAndDuration(Resource):
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
             game_code = data["game_code"]
             num_rounds = data["number_of_rounds"]
             seconds = data["round_duration"]
@@ -1006,7 +1006,7 @@ class changeRoundsAndDuration(Resource):
                                 WHERE game_code=\'''' + game_code + '''\'
                                 '''
             update_game_attr = execute(change_rounds_and_duration_query, "post", conn)
-            print("game_attr_update info: ", update_game_attr)
+            # print("game_attr_update info: ", update_game_attr)
             if update_game_attr["code"] == 281:
                 response["message"] = "281, Rounds and duration successfully updated."
                 return response, 200
@@ -1018,8 +1018,8 @@ class changeRoundsAndDuration(Resource):
 
 class startPlaying(Resource):
     def get(self, game_code, round_number):
-        print("game_code: ", game_code)
-        print("round_number: ", round_number)
+        # print("game_code: ", game_code)
+        # print("round_number: ", round_number)
         response = {}
         try:
             conn = connect()
@@ -1033,7 +1033,7 @@ class startPlaying(Resource):
                                 AND round_number=\'''' + round_number + '''\'
                                 '''
             round_timestamp = execute(start_round_query, "post", conn)
-            print("round_timestamp_result: ", round_timestamp)
+            # print("round_timestamp_result: ", round_timestamp)
             if round_timestamp["code"] == 281:
                 response["message"] = "281, game started."
                 response["round_start_time"] = current_time
@@ -1047,8 +1047,8 @@ class startPlaying(Resource):
 # ENDPOINT IN USE - TEST PRINT STATEMENTS ADDED
 class getUniqueImageInRound(Resource):
     def get(self, game_code, round_number):
-        print("requested game_code: ", game_code)
-        print("requested round_number: ", round_number)
+        # print("requested game_code: ", game_code)
+        # print("requested round_number: ", round_number)
         response = {}
         items = {}
         try:
@@ -1061,7 +1061,7 @@ class getUniqueImageInRound(Resource):
             #                         (SELECT DISTINCT round_deck_uid FROM captions.round WHERE round_game_uid = (
             #                             SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))'''
 
-            print("Check if Harvard Deck")
+            # print("Check if Harvard Deck")
             check_deck_harvard_query = '''
                                 SELECT deck_title
                                 FROM captions.deck
@@ -1075,7 +1075,7 @@ class getUniqueImageInRound(Resource):
             
 
             if(deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
-                print("User selected Harvard Deck")
+                # print("User selected Harvard Deck")
                 get_images_query = '''
                                             SELECT distinct captions.round.round_image_uid
                                             FROM captions.round
@@ -1085,13 +1085,13 @@ class getUniqueImageInRound(Resource):
                                             WHERE game_code=\'''' + game_code + '''\')
                                             '''
                 image_info = execute(get_images_query, "get", conn)
-                print("harvard image info: ", image_info)
+                # print("harvard image info: ", image_info)
 
                 images_used = set()
                 for result in image_info["result"]:
                     if result["round_image_uid"] not in images_used:
                         images_used.add(result["round_image_uid"])
-                print(images_used, type(images_used))
+                # print(images_used, type(images_used))
                 flag = True
                 image_id = ""
                 while flag:
@@ -1101,19 +1101,19 @@ class getUniqueImageInRound(Resource):
 
                     harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page=" + str(
                         page)
-                    print(harvardURL)
+                    # print(harvardURL)
                     r = requests.get(harvardURL)
-                    print(index)
+                    # print(index)
                     # print("before return for getUniqueImage ", r.json()["records"][index]["baseimageurl"])
 
                     # image_uid = index
                     image_uid = r.json()["records"][index]["imageid"]
                     image_id = str(image_uid)
-                    print("curr index: ", image_uid)
+                    # print("curr index: ", image_uid)
                     if image_uid not in images_used:
                         flag = False
 
-                print("next_image_id: ", image_id, type(image_id))
+                # print("next_image_id: ", image_id, type(image_id))
 
                 write_to_round_query = '''
                                                         UPDATE captions.round
@@ -1123,7 +1123,7 @@ class getUniqueImageInRound(Resource):
                                                         AND round_number = \'''' + round_number + '''\'
                                                         '''
                 updated_round = execute(write_to_round_query, "post", conn)
-                print("game_attr_update info: ", updated_round)
+                # print("game_attr_update info: ", updated_round)
 
                 if updated_round["code"] == 281:
                     response["message"] = "281, image in the Round updated."
@@ -1140,7 +1140,7 @@ class getUniqueImageInRound(Resource):
 
             #Below is the code for the non-harvard api decks(do not touch)  >:(
             ################################################################################
-            print("User selected deck other than Harvard")
+            # print("User selected deck other than Harvard")
 
             # RETURN ALL IMAGES ASSOCIATED WITH A DATABASE DECK
             get_images_query = '''
@@ -1153,32 +1153,32 @@ class getUniqueImageInRound(Resource):
                             '''
             image_info = execute(get_images_query, "get", conn)
 
-            print("\nimage info: ", image_info)
-            print("\nimage result: ", image_info["result"][0])
-            print("\nround image: ", image_info["result"][0]["round_image_uid"])
+            # print("\nimage info: ", image_info)
+            # print("\nimage result: ", image_info["result"][0])
+            # print("\nround image: ", image_info["result"][0]["round_image_uid"])
 
             if image_info["code"] == 280:
                 images_in_deck_str = image_info["result"][0]["deck_image_uids"][2:-2]#.split(', ')
                 images_in_deck_str = images_in_deck_str.replace('"', " ")
                 images_in_deck = images_in_deck_str.split(" ,  ")
-                print("\nImages in deck: ", images_in_deck)
+                # print("\nImages in deck: ", images_in_deck)
 
                 images_used = set()
                 for result in image_info["result"]:
                     if result["round_image_uid"] not in images_used:
                         images_used.add(result["round_image_uid"])
-                print(images_in_deck, type(images_in_deck))
-                print(images_used, type(images_used))
+                # print(images_in_deck, type(images_in_deck))
+                # print(images_used, type(images_used))
                 flag = True
                 image_uid = ""
                 while flag:
                     index = random.randint(0, len(images_in_deck)-1)
-                    print("curr index: ", index)
+                    # print("curr index: ", index)
                     if images_in_deck[index] not in images_used:
                         image_uid = images_in_deck[index]
                         flag = False
 
-                print("next_image_uid: ", image_uid, type(image_uid))
+                # print("next_image_uid: ", image_uid, type(image_uid))
 
                 response["message1"] = "280, get image request successful."
                 get_image_url_query = '''
@@ -1186,7 +1186,7 @@ class getUniqueImageInRound(Resource):
                                     WHERE image_uid=\'''' + image_uid + '''\'
                                     '''
                 image_url = execute(get_image_url_query, "get", conn)
-                print("image_url: ", image_url)
+                # print("image_url: ", image_url)
                 if image_url["code"] == 280:
                     #update round image query
                     write_to_round_query = '''
@@ -1197,7 +1197,7 @@ class getUniqueImageInRound(Resource):
                                         AND round_number = \'''' + round_number + '''\'
                                         '''
                     updated_round = execute(write_to_round_query, "post", conn)
-                    print("game_attr_update info: ", updated_round)
+                    # print("game_attr_update info: ", updated_round)
                     if updated_round["code"] == 281:
                         response["message"] = "281, image in the Round updated."
                         response["image_url"] = image_url["result"][0]["image_url"]
@@ -1211,8 +1211,8 @@ class getUniqueImageInRound(Resource):
 # ENDPOINT IN USE - TEST PRINT STATEMENTS ADDED
 class getImageForPlayers(Resource):
     def get(self, game_code, round_number):
-        print("requested game_code: ", game_code)
-        print("requested round_number:", round_number)
+        # print("requested game_code: ", game_code)
+        # print("requested round_number:", round_number)
         response = {}
         items = {}
         try:
@@ -1230,7 +1230,7 @@ class getImageForPlayers(Resource):
             
 
             if(deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
-                print("In getImageForPlayers in Harvard Deck")
+                # print("In getImageForPlayers in Harvard Deck")
                 get_image_query = '''
                                     SELECT DISTINCT captions.round.round_image_uid
                                     FROM captions.round
@@ -1242,19 +1242,19 @@ class getImageForPlayers(Resource):
 
                 image_info = execute(get_image_query, "get", conn)
                 image_uid = image_info["result"][0]["round_image_uid"]
-                print(image_uid, type(image_uid))
+                # print(image_uid, type(image_uid))
                 # page = image_uid//10 + 1
                 # index = image_uid%10
 
                 harvardURL = "https://api.harvardartmuseums.org/image/"+ image_uid +"?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633"
                 #harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page="
-                print(harvardURL)
+                # print(harvardURL)
                 #print(index)
                 r = requests.get(harvardURL)
                 #print("before return getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
 
 
-                print("image info: ", image_info)
+                # print("image info: ", image_info)
                 if image_info["code"] == 280:
                     response["message"] = "280, get image for players other than host request successful."
                     response["image_id"] = image_uid
@@ -1277,10 +1277,10 @@ class getImageForPlayers(Resource):
                                             FROM captions.round 
                                             WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\'))             
                             '''
-            print("In getImageForPlayers Non Harvard Deck")
+            # print("In getImageForPlayers Non Harvard Deck")
             image_info = execute(get_image_query, "get", conn)
 
-            print("image info: ", image_info)
+            # print("image info: ", image_info)
             if image_info["code"] == 280:
                 response["message"] = "280, get image for players other than host request successful."
                 response["image_uid"] = image_info["result"][0]["round_image_uid"]
@@ -1307,8 +1307,8 @@ class getRoundImage(Resource):
             # print("Received:", data)
             # round_number = data["round_number"]
             # game_code = data["game_code"]
-            print(game_code)
-            print(round_number)
+            # print(game_code)
+            # print(round_number)
 
             if round_number != "0":
 
@@ -1321,7 +1321,7 @@ class getRoundImage(Resource):
                                     GROUP BY round_image_uid;
                                     '''
                 images = execute(images_used_in_round, "get", conn)
-                print("caption info: ", images["result"])
+                # print("caption info: ", images["result"])
                 if images["code"] == 280:
                     response["result"] = images["result"]
                     response["message"] = "280, Found Images used in Round."
@@ -1336,7 +1336,7 @@ class getRoundImage(Resource):
                                     GROUP BY round_image_uid, round_number;
                                     '''
                 images = execute(images_used_in_round, "get", conn)
-                print("caption info: ", images["result"])
+                # print("caption info: ", images["result"])
                 if images["code"] == 280:
                     response["result"] = images["result"]
                     response["message"] = "280, Found Images used in Round."
@@ -1356,11 +1356,11 @@ class postRoundImage(Resource):
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
             round_number = data["round_number"]
             game_code = data["game_code"]
             image_uid = data["image"]
-            print(round_number)
+            # print(round_number)
 
             write_to_round_query = '''
                                     UPDATE captions.round
@@ -1370,7 +1370,7 @@ class postRoundImage(Resource):
                                     AND round_number = \'''' + round_number + '''\'
                                     '''
             updated_round = execute(write_to_round_query, "post", conn)
-            print("Image info written to db: ", updated_round)
+            # print("Image info written to db: ", updated_round)
             if updated_round["code"] == 281:
                 response["message2"] = "281, Round updated."
                 return response, 200
@@ -1388,7 +1388,7 @@ class submitCaption(Resource):
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
             caption = data["caption"]
             caption = caption.replace("'", '"')
             round_number = data["round_number"]
@@ -1404,7 +1404,7 @@ class submitCaption(Resource):
                                 AND round_user_uid=\'''' + user_uid + '''\' 
                                 '''
             caption = execute(submit_caption_query, "post", conn)
-            print("caption info: ", caption)
+            # print("caption info: ", caption)
             if caption["code"] == 281:
                 response["message"] = "281, Caption for the user updated."
 
@@ -1417,7 +1417,7 @@ class submitCaption(Resource):
                                                 caption IS NULL
                                             '''
                 no_caption = execute(no_caption_submitted_query, "get", conn)
-                print("no caption info: ", no_caption["result"][0]["NoCaptionSubmitted"])
+                # print("no caption info: ", no_caption["result"][0]["NoCaptionSubmitted"])
                 response["no_caption_submitted"] = no_caption["result"][0]["NoCaptionSubmitted"]
 
                 return response, 200
@@ -1429,8 +1429,8 @@ class submitCaption(Resource):
 
 class getPlayersRemainingToSubmitCaption(Resource):
     def get(self, game_code, round_number):
-        print("requested game_code: ", game_code)
-        print("requested round_number:", round_number)
+        # print("requested game_code: ", game_code)
+        # print("requested round_number:", round_number)
         response = {}
         items = {}
         try:
@@ -1447,7 +1447,7 @@ class getPlayersRemainingToSubmitCaption(Resource):
                             '''
             players_info = execute(get_players_query, "get", conn)
 
-            print("players info: ", players_info)
+            # print("players info: ", players_info)
             if players_info["code"] == 280:
                 response["message1"] = "280, get players yet to submit captions request successful."
                 response["players"] = players_info["result"]
@@ -1460,8 +1460,8 @@ class getPlayersRemainingToSubmitCaption(Resource):
 
 class getAllSubmittedCaptions(Resource):
     def get(self, game_code, round_number):
-        print("requested game_code: ", game_code)
-        print("requested round_number:", round_number)
+        # print("requested game_code: ", game_code)
+        # print("requested round_number:", round_number)
         response = {}
         items = {}
         try:
@@ -1475,7 +1475,7 @@ class getAllSubmittedCaptions(Resource):
                             '''
             captions = execute(get_captions_query, "get", conn)
 
-            print("players info: ", captions)
+            # print("players info: ", captions)
             if captions["code"] == 280:
                 response["message1"] = "280, get players who submitted captions request successful."
                 response["players"] = captions["result"]
@@ -1494,9 +1494,9 @@ class voteCaption(Resource):
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
             caption = data["caption"]
-            print("caption info: ", caption)
+            # print("caption info: ", caption)
             round_number = data["round_number"]
             game_code = data["game_code"]
             # bring in User ID
@@ -1516,7 +1516,7 @@ class voteCaption(Resource):
                                 AND round_user_uid=\'''' + user_id + '''\'                                  
                                 '''
                 novote = execute(submit_novote_query, "post", conn)
-                print("no vote info: ", novote)
+                # print("no vote info: ", novote)
                 if novote["code"] == 281:
                     response["message"] = "281, No Vote Recorded."
                     # return response, 200
@@ -1531,7 +1531,7 @@ class voteCaption(Resource):
                                 AND caption=\'''' + caption + '''\'                                  
                                 '''
                 caption = execute(submit_caption_query, "post", conn)
-                print("caption info: ", caption)
+                # print("caption info: ", caption)
                 if caption["code"] == 281:
                     response["message"] = "281, Vote Recorded."
                     # return response, 200
@@ -1547,8 +1547,8 @@ class voteCaption(Resource):
                             '''
             players_count = execute(get_players_count_query, "get", conn)
 
-            print("players info: ", players_count)
-            print("players info code: ", players_count["code"])
+            # print("players info: ", players_count)
+            # print("players info code: ", players_count["code"])
             if players_count["code"] == 280:
 
                 response["message1"] = "280, get players who haven't submitted votes request successful."
@@ -1565,8 +1565,8 @@ class voteCaption(Resource):
 
 class getPlayersWhoHaventVoted(Resource):
     def get(self, game_code, round_number):
-        print("requested game_code: ", game_code)
-        print("requested round_number:", round_number)
+        # print("requested game_code: ", game_code)
+        # print("requested round_number:", round_number)
         response = {}
         items = {}
         try:
@@ -1582,8 +1582,8 @@ class getPlayersWhoHaventVoted(Resource):
                             '''
             players_count = execute(get_players_count_query, "get", conn)
 
-            print("players info: ", players_count)
-            print("players info code: ", players_count["code"])
+            # print("players info: ", players_count)
+            # print("players info code: ", players_count["code"])
             if players_count["code"] == 280:
 
                 response["message1"] = "280, get players who haven't submitted votes request successful."
@@ -1623,8 +1623,8 @@ class getScores(Resource):
         #     raise BadRequest("Get scores request failed")
         # finally:
         #     disconnect(conn)
-        print("requested game_code: ", game_code)
-        print("requested round_number:", round_number)
+        # print("requested game_code: ", game_code)
+        # print("requested round_number:", round_number)
         response = {}
         items = {}
         try:
@@ -1636,7 +1636,7 @@ class getScores(Resource):
                             GROUP BY round_user_uid
                             '''
             game_score = execute(get_game_score, "get", conn)
-            print("game_score_info:", game_score)
+            # print("game_score_info:", game_score)
             if game_score["code"] == 280:
                 get_score_query = '''
                                 SELECT captions.round.round_user_uid, captions.user.user_alias,
@@ -1649,7 +1649,7 @@ class getScores(Resource):
                                 AND round_number=\'''' + round_number + '''\'
                                 '''
                 scoreboard = execute(get_score_query, "get", conn)
-                print("score info: ", scoreboard)
+                # print("score info: ", scoreboard)
                 if scoreboard["code"] == 280:
                     response["message"] = "280, scoreboard is updated and get_score_board request " \
                                           "successful."
@@ -1669,8 +1669,8 @@ class getScores(Resource):
 
 class getScoreBoard(Resource):
     def get(self, game_code, round_number):
-        print("requested game_code: ", game_code)
-        print("requested round_number:", round_number)
+        # print("requested game_code: ", game_code)
+        # print("requested round_number:", round_number)
         response = {}
         items = {}
         try:
@@ -1682,10 +1682,10 @@ class getScoreBoard(Resource):
                             WHERE game_code=\'''' + game_code + '''\'
                             '''
             scoring_info = execute(get_scoring, "get", conn)
-            print("scoring info: ", scoring_info)
+            # print("scoring info: ", scoring_info)
             if scoring_info["code"] == 280:
                 scoring = scoring_info["result"][0]["scoring_scheme"]
-                print(scoring)
+                # print(scoring)
                 if scoring == "R" or scoring == 'r':
                     highest_votes = 0
                     second_highest_votes = 0
@@ -1696,10 +1696,10 @@ class getScoreBoard(Resource):
                                         AND round_number=\'''' + round_number + '''\'
                                         '''
                     winner = execute(get_highest_votes, "get", conn)
-                    print("winner_info:", winner)
+                    # print("winner_info:", winner)
                     if winner["code"] == 280:
                         highest_votes = str(winner["result"][0]["MAX(votes)"])
-                        print("highest votes: ", highest_votes, type(highest_votes))
+                        # print("highest votes: ", highest_votes, type(highest_votes))
                         get_second_highest_votes = '''
                                                     SELECT votes FROM captions.round 
                                                     WHERE round_game_uid=(SELECT game_uid FROM captions.game 
@@ -1709,12 +1709,12 @@ class getScoreBoard(Resource):
                                                     ORDER BY votes DESC
                                                     '''
                         runner_up = execute(get_second_highest_votes, "get", conn)
-                        print("runner-up info:", runner_up)
+                        # print("runner-up info:", runner_up)
                         if runner_up["code"] == 280:
                             second_highest_votes = str(runner_up["result"][0]["votes"]) if runner_up["result"] and \
                                                                                            runner_up["result"][0][
                                                                                                "votes"] > 0 else "-1"
-                            print("second highest votes: ", second_highest_votes, type(second_highest_votes))
+                            # print("second highest votes: ", second_highest_votes, type(second_highest_votes))
                             update_scores_query = '''
                                                 UPDATE captions.round	
                                                 SET score = CASE
@@ -1739,7 +1739,7 @@ class getScoreBoard(Resource):
                                                     AND round_number=\'''' + round_number + '''\'
                                                     '''
                     update_scores = execute(update_score_by_votes_query, "post", conn)
-                    print("update_score_info: ", update_scores)
+                    # print("update_score_info: ", update_scores)
                     if update_scores["code"] == 281:
                         response["message"] = "281, update scoreboard by votes request successful."
                         # return response, 200
@@ -1754,7 +1754,7 @@ class getScoreBoard(Resource):
                             GROUP BY round_user_uid
                             '''
             game_score = execute(get_game_score, "get", conn)
-            print("game_score_info:", game_score)
+            # print("game_score_info:", game_score)
             if game_score["code"] == 280:
                 get_score_query = '''
                                 SELECT captions.round.round_user_uid, captions.user.user_alias,
@@ -1767,7 +1767,7 @@ class getScoreBoard(Resource):
                                 AND round_number=\'''' + round_number + '''\'
                                 '''
                 scoreboard = execute(get_score_query, "get", conn)
-                print("score info: ", scoreboard)
+                # print("score info: ", scoreboard)
                 if scoreboard["code"] == 280:
                     response["message"] = "280, scoreboard is updated and get_score_board request " \
                                           "successful."
@@ -1787,8 +1787,8 @@ class getScoreBoard(Resource):
 
 class updateScores(Resource):
     def get(self, game_code, round_number):
-        print("requested game_code: ", game_code)
-        print("requested round_number:", round_number)
+        # print("requested game_code: ", game_code)
+        # print("requested round_number:", round_number)
         response = {}
         items = {}
         try:
@@ -1798,10 +1798,10 @@ class updateScores(Resource):
                             WHERE game_code=\'''' + game_code + '''\'
                             '''
             scoring_info = execute(get_scoring, "get", conn)
-            print("scoring info: ", scoring_info)
+            # print("scoring info: ", scoring_info)
             if scoring_info["code"] == 280:
                 scoring = scoring_info["result"][0]["scoring_scheme"]
-                print(scoring)
+                # print(scoring)
                 if scoring == "R" or scoring == 'r':
                     highest_votes = 0
                     second_highest_votes = 0
@@ -1812,10 +1812,10 @@ class updateScores(Resource):
                                         AND round_number=\'''' + round_number + '''\'
                                         '''
                     winner = execute(get_highest_votes, "get", conn)
-                    print("winner_info:", winner)
+                    # print("winner_info:", winner)
                     if winner["code"] == 280:
                         highest_votes = str(winner["result"][0]["MAX(votes)"])
-                        print("highest votes: ", highest_votes, type(highest_votes))
+                        # print("highest votes: ", highest_votes, type(highest_votes))
                         get_second_highest_votes = '''
                                                     SELECT votes FROM captions.round 
                                                     WHERE round_game_uid=(SELECT game_uid FROM captions.game 
@@ -1825,12 +1825,12 @@ class updateScores(Resource):
                                                     ORDER BY votes DESC
                                                     '''
                         runner_up = execute(get_second_highest_votes, "get", conn)
-                        print("runner-up info:", runner_up)
+                        # print("runner-up info:", runner_up)
                         if runner_up["code"] == 280:
                             second_highest_votes = str(runner_up["result"][0]["votes"]) if runner_up["result"] and \
                                                                                            runner_up["result"][0][
                                                                                                "votes"] > 0 else "-1"
-                            print("second highest votes: ", second_highest_votes, type(second_highest_votes))
+                            # print("second highest votes: ", second_highest_votes, type(second_highest_votes))
                             update_scores_query = '''
                                                 UPDATE captions.round	
                                                 SET score = CASE
@@ -1855,7 +1855,7 @@ class updateScores(Resource):
                                                     AND round_number=\'''' + round_number + '''\'
                                                     '''
                     update_scores = execute(update_score_by_votes_query, "post", conn)
-                    print("update_score_info: ", update_scores)
+                    # print("update_score_info: ", update_scores)
                     if update_scores["code"] == 281:
                         response["message"] = "281, update scoreboard by votes request successful."
                         return response, 200
@@ -1873,11 +1873,11 @@ class createNextRound(Resource):
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
             round_number = data["round_number"]
             game_code = data["game_code"]
             new_round_number = str(int(round_number) + 1)
-            print("Next Round Number:", new_round_number)
+            # print("Next Round Number:", new_round_number)
 
             players_query = '''
                                 SELECT round_user_uid, round_deck_uid FROM captions.round
@@ -1886,10 +1886,10 @@ class createNextRound(Resource):
                                 AND round_number=\'''' + round_number + '''\'
                                 '''
             players = execute(players_query, "get", conn)
-            print("players count:", players)
+            # print("players count:", players)
             if players["code"] == 280:
                 num_players = len(players["result"])
-                print("players in the game: ", num_players)
+                # print("players in the game: ", num_players)
                 for i in range(num_players):
                     new_round_uid = get_new_roundUID(conn)
                     user_uid = players["result"][i]["round_user_uid"]
@@ -1906,7 +1906,7 @@ class createNextRound(Resource):
                                                     score=0
                                                     '''
                     next_round = execute(add_user_to_next_round_query, "post", conn)
-                    print("next_round info: ", next_round)
+                    # print("next_round info: ", next_round)
                     if next_round["code"] == 281:
                         continue
                     else:
@@ -1931,7 +1931,7 @@ class createRounds(Resource):
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
 
             game_code = data["game_code"]
             imageURLs = data["images"]
@@ -1940,12 +1940,12 @@ class createRounds(Resource):
             # num_rounds = data["rounds"]
             # time_limit = data["round_time"]
             # scoring = data["scoring_scheme"]
-            print(game_code)
-            print("all images: ", imageURLs)
-            print("individual image: ", imageURLs[0])
+            # print(game_code)
+            # print("all images: ", imageURLs)
+            # print("individual image: ", imageURLs[0])
             image_count = len(imageURLs)
-            print("Number of images received: ", image_count)
-            print(len(data))
+            # print("Number of images received: ", image_count)
+            # print(len(data))
             
             i = 0
 
@@ -1956,16 +1956,16 @@ class createRounds(Resource):
                     WHERE game_code = \'''' + game_code + '''\';
                     '''
             game_data = execute(game_query, "get", conn)
-            print("game data:", game_data["result"])
+            # print("game data:", game_data["result"])
             num_rounds = game_data["result"][i]["num_rounds"]
-            print("number of rounds:",  num_rounds )
+            # print("number of rounds:",  num_rounds )
             deck_uid = game_data["result"][i]["game_deck"]
-            print("game deck:", deck_uid )
+            # print("game deck:", deck_uid )
             game_uid = game_data["result"][i]["game_uid"]
-            print("game UID:", game_uid )
+            # print("game UID:", game_uid )
 
             if image_count != num_rounds:
-                print("image count mismatch")
+                # print("image count mismatch")
                 response["message"] = "Image count mismatch."
                 return response
 
@@ -1976,28 +1976,28 @@ class createRounds(Resource):
                     WHERE round_game_uid = \'''' + game_uid + '''\';
                     '''
             player_data = execute(player_query, "get", conn)
-            print("player data:", player_data["result"])
+            # print("player data:", player_data["result"])
             num_players = len(player_data["result"])
-            print("number of players: ", num_players)
+            # print("number of players: ", num_players)
 
             p = 0
             for p in range(num_players):
                 user_uid = player_data["result"][p]["round_user_uid"]
-                print(user_uid)
+                # print(user_uid)
 
 
             # CREATE ROWS FOR EACH PLAYER, EACH ROUND
             p = 0
             for n in range(num_rounds):
                 for p in range(num_players):
-                    print("In loop: ", n, p)
+                    # print("In loop: ", n, p)
                     new_round_uid = get_new_roundUID(conn)
-                    print(new_round_uid)
+                    # print(new_round_uid)
                     user_uid = player_data["result"][p]["round_user_uid"]
-                    print(user_uid)
+                    # print(user_uid)
                     round = n + 1
                     image = imageURLs[n]
-                    print(new_round_uid, user_uid, game_uid, round, deck_uid)
+                    # print(new_round_uid, user_uid, game_uid, round, deck_uid)
 
                     if round == 1:
                         add_user_to_next_round_query = '''
@@ -2022,7 +2022,7 @@ class createRounds(Resource):
                                                     score=0
                                                     '''
                     next_round = execute(add_user_to_next_round_query, "post", conn)
-                    print("next_round info: ", next_round)
+                    # print("next_round info: ", next_round)
                     if next_round["code"] == 281:
                         continue
                     else:
@@ -2040,7 +2040,7 @@ class createRounds(Resource):
                                 round_number = '1';
                             '''
             first_image_data = execute(first_image_query, "get", conn)
-            print("first image URL:", first_image_data["result"])
+            # print("first image URL:", first_image_data["result"])
 
             response["message"] = "281, Next Round successfully created."
             response["image"] = first_image_data["result"][0]["round_image_uid"]
@@ -2060,7 +2060,7 @@ class getNextImage(Resource):
             conn = connect()
             data = request.get_json(force=True)
             # print to Received data to Terminal
-            print("Received:", data)
+            # print("Received:", data)
             round_number = data["round_number"]
             game_code = data["game_code"]
 
@@ -2073,7 +2073,7 @@ class getNextImage(Resource):
                                 AND round_number=\'''' + round_number + '''\';
                         '''
             image = execute(image_query, "get", conn)
-            print("image URL:", image["result"])
+            # print("image URL:", image["result"])
             response["image"] = image["result"][0]["round_image_uid"]
             return response, 200
 
@@ -2085,7 +2085,7 @@ class getNextImage(Resource):
 
 class endGame(Resource):
     def get(self, game_code):
-        print("game code: ", game_code)
+        # print("game code: ", game_code)
         response = {}
         history_object = {}
         try:
@@ -2107,7 +2107,7 @@ class endGame(Resource):
             game_info = execute(get_game_info_query, "get", conn)
             # print("game_info: ", game_info)
             if game_info["code"] == 280:
-                print("num_rounds:", len(game_info["result"]))
+                # print("num_rounds:", len(game_info["result"]))
                 for i in range(len(game_info["result"])):
                     key = "round "+str(i+1)
                     history_object[key] = {}
@@ -2147,28 +2147,28 @@ class uploadImage(Resource):
         items = {}
         try:
             conn = connect()
-            print("receiving_data")
+            # print("receiving_data")
             image_title = request.form.get("image_title")
-            print("image_title: ", image_title)
+            # print("image_title: ", image_title)
             image_cost = request.form.get("image_cost")
-            print("image_cost: ", image_cost)
+            # print("image_cost: ", image_cost)
             image_description = request.form.get("image_description")
-            print("image_description: ", image_description)
+            # print("image_description: ", image_description)
             image = request.files.get("image_file")
-            print("image: ", image)
+            # print("image: ", image)
 
             #deck name
             deck_name = request.form.get("deck_name")
-            print("deck_name: ", deck_name)
+            # print("deck_name: ", deck_name)
 
             new_image_uid = get_new_imageUID(conn)
-            print("new_image_uid: ", new_image_uid)
+            # print("new_image_uid: ", new_image_uid)
 
             key = "caption_image/" + str(new_image_uid)
-            print("image_key: ", key)
+            # print("image_key: ", key)
 
             image_url = helper_upload_user_img(image, key)
-            print("image_url: ", image_url)
+            # print("image_url: ", image_url)
 
             add_image_query = '''
                             INSERT INTO captions.image
@@ -2179,7 +2179,7 @@ class uploadImage(Resource):
                                 image_description = \'''' + image_description + '''\'                    
                             ''' 
             image_response = execute(add_image_query, "post", conn)
-            print("image_response: ", image_response)
+            # print("image_response: ", image_response)
 
 
             get_image_uids_query = '''
@@ -2188,17 +2188,17 @@ class uploadImage(Resource):
                             WHERE deck_title =\'''' + deck_name + '''\'                
                             '''
             deck_response = execute(get_image_uids_query, "get", conn)
-            print("deck_response: ", deck_response)
+            # print("deck_response: ", deck_response)
 
             uid_string = deck_response["result"][0]["deck_image_uids"]
-            print("The following is the uid string", uid_string)
+            # print("The following is the uid string", uid_string)
 
             if(uid_string == "()"): #is this how we check for string deep equality in python?
                 uid_string = "(\"" + new_image_uid + "\")"
             else:
                 uid_string = uid_string[:-1] + ", \"" + new_image_uid + "\")"
 
-            print("The following is the new uid string", uid_string)
+            # print("The following is the new uid string", uid_string)
 
 
 
@@ -2208,7 +2208,7 @@ class uploadImage(Resource):
                                             WHERE deck_title =\'''' + deck_name + '''\' 
                                             '''
             update_deck_response = execute(add_to_image_uids_query, "post", conn)
-            print("update_deck_response: ", update_deck_response)
+            # print("update_deck_response: ", update_deck_response)
 
             if image_response["code"] == 281:
                 response["message"] = "281, image successfully added to the database."
@@ -2227,18 +2227,18 @@ class CheckEmailValidationCode(Resource):
         try:
             conn = connect()
             data = request.get_json(force=True)
-            print("Received JSON data: ", data)
+            # print("Received JSON data: ", data)
 
             user_uid = data["user_uid"]
             code = data["code"]
-            print("user uid = ", user_uid, ", code = ", code)
+            # print("user uid = ", user_uid, ", code = ", code)
 
             get_verification_code_query = '''
                             SELECT email_validated FROM captions.user WHERE user_uid=\'''' + user_uid + '''\'
                             '''
 
             validation = execute(get_verification_code_query, "get", conn)
-            print("validation info: ", validation)
+            # print("validation info: ", validation)
 
             #If for some reason we can't find a user in the table with the given user_uid....
             if len(validation["result"]) == 0:
@@ -2251,7 +2251,7 @@ class CheckEmailValidationCode(Resource):
             # we will cross-examine the code they have typed in against what we have stored in the database.
             #If it matches --> hooray! We set the email_validated of that user to true.
             #If it DOES NOT match --> whoops! They typed in a bad code.
-            print("first element of list", validation["result"][0])
+            # print("first element of list", validation["result"][0])
             if validation["result"][0]["email_validated"] == "TRUE":
                 response["message"] = "User Email for this specific user has already been verified." \
                                       " No need for a code! :)"
@@ -2268,7 +2268,7 @@ class CheckEmailValidationCode(Resource):
                                 WHERE user_uid=\'''' + user_uid + '''\'
                                 '''
                 verification = execute(set_code_query, "post", conn)
-                print("User code has been updated to TRUE")
+                # print("User code has been updated to TRUE")
                 response["message"] = "User Email Verification Code has been validated. Have fun!"
                 response["email_validated_status"] = "TRUE"
 
@@ -2291,12 +2291,12 @@ class CheckEmailValidationCode(Resource):
 
 class testHarvard(Resource):
     def get(self):
-        print("beginning testHarvard")
+        # print("beginning testHarvard")
         response = {}
         items = {}
         try:
             conn = connect()
-            print("connection established")
+            # print("connection established")
 
             num = randint(1,376513)
             page = num/10 + 1
@@ -2403,12 +2403,12 @@ class summary(Resource):
 
 class summaryEmail(Resource):
     def post(self):
-        print("In Summary Email")
+        # print("In Summary Email")
         try:
             conn = connect()
             response = {}
             data = request.get_json()
-            print("Data Received: ", data)
+            # print("Data Received: ", data)
             game_uid = data["gameUID"]
             host_email = data["email"]
             recipients = [host_email, 'pmarathay@yahoo.com']
@@ -2424,13 +2424,13 @@ class summaryEmail(Resource):
                     WHERE round_game_uid = \'''' + game_uid + '''\'
                     '''
             emails = execute(emailQuery, "get", conn)["result"]
-            print(emails)
+            # print(emails)
 
             # Extract emails, add to recipients, ensure uniqueness, and format as a list
             recipients = list(set(recipients + [player['user_email'] for player in emails]))
 
             # Print the final list
-            print(recipients)
+            # print(recipients)
 
 
 
@@ -2497,7 +2497,7 @@ class summaryEmail(Resource):
 
         except Exception as e:
             response["Confrimation"] = 'email failure'
-            print(recipients)
+            # print(recipients)
             response["Recipients"] = recipients
             raise InternalServerError("An unknown error occurred") from e
         finally:
@@ -2509,7 +2509,7 @@ class summaryEmail(Resource):
 
 class CNNWebScrape(Resource):
      def get(self):
-        print("in cnn web scraper")
+        # print("in cnn web scraper")
         response={}
         try:
             conn = connect()
@@ -2520,7 +2520,7 @@ class CNNWebScrape(Resource):
             # query  = 'SELECT * FROM cnn_images'
             query = 'SELECT id, article_link,date, week_no, year, thumbnail_link, title FROM cnn_images'
             items = execute(query, "get", conn)
-            print("items: ", items)
+            # print("items: ", items)
             if items["code"] == 280:
                 response["message"] = "Fetch successful"
                 response["data"] = items["result"]
