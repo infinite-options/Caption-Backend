@@ -21,10 +21,12 @@ import random
 import string
 import stripe
 
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, Response
 from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_mail import Mail, Message
+
+from prometheus_client import Counter, generate_latest
 
 # from cnn_webscrape import lambda_handler
 # used for serializer email and error handling
@@ -145,6 +147,12 @@ api = Api(app)
 
 # convert to UTC time zone when testing in local time zone
 utc = pytz.utc
+
+REQUEST_COUNTER = Counter(
+                    'capshnz_http_requests_total', 
+                    'Total HTTP requests by status code and endpoint',
+                    ['endpoint', 'status_code', 'client_ip']
+                )
 
 
 # # These statment return Day and Time in GMT
@@ -2536,6 +2544,24 @@ class CNNWebScrape(Resource):
         finally:
             disconnect(conn)
         return response
+
+@app.before_request
+def before_request():
+    client_ip = request.remote_addr
+    print(f"Incoming request from IP: {client_ip} to {request.path} with method {request.method}")
+
+@app.after_request
+def after_request(response):
+    endpoint = request.path
+    status_code = response.status_code
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+    REQUEST_COUNTER.labels(endpoint=endpoint, status_code=status_code, client_ip=client_ip).inc()
+    # print(f"Request from IP: {client_ip}, Endpoint: {endpoint}, Status: {status_code}")
+    return response
+
+class Metrics(Resource):
+    def get(self):
+        return Response(generate_latest(), mimetype="text/plain")
     
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
@@ -2590,6 +2616,7 @@ api.add_resource(addFeedback, "/api/v2/addFeedback")
 api.add_resource(summary, "/api/v2/summary")
 api.add_resource(summaryEmail, "/api/v2/summaryEmail")
 
+api.add_resource(Metrics, "/metrics")
 
 ## webscrape api
 api.add_resource(CNNWebScrape , "/api/v2/cnn_webscrape")
