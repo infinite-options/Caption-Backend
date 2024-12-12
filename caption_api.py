@@ -21,12 +21,13 @@ import random
 import string
 import stripe
 
-from flask import Flask, request, render_template, Response
+from flask import Flask, request, render_template, Response, g
 from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_mail import Mail, Message
 
-from prometheus_client import Counter, generate_latest
+from prometheus_client import Counter, generate_latest, Summary
+import logging
 
 # from cnn_webscrape import lambda_handler
 # used for serializer email and error handling
@@ -148,11 +149,23 @@ api = Api(app)
 # convert to UTC time zone when testing in local time zone
 utc = pytz.utc
 
+# REQUEST_COUNTER = Counter(
+#                     'capshnz_http_requests_total', 
+#                     'Total HTTP requests by status code and endpoint',
+#                     ['endpoint', 'status_code', 'client_ip']
+#                 )
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+logger = logging.getLogger(__name__)
+
 REQUEST_COUNTER = Counter(
-                    'capshnz_http_requests_total', 
-                    'Total HTTP requests by status code and endpoint',
-                    ['endpoint', 'status_code', 'client_ip']
-                )
+    'capshnz_http_requests_total',
+    'Total HTTP requests by method, endpoint, status code, and client IP',
+    ['method', 'endpoint', 'status_code', 'client_ip']
+)
+LATENCY_SUMMARY = Summary(
+    'capshnz_http_request_latency_seconds', 'Request latency by endpoint', ['endpoint']
+)
 
 
 # # These statment return Day and Time in GMT
@@ -2547,17 +2560,39 @@ class CNNWebScrape(Resource):
 
 @app.before_request
 def before_request():
-    client_ip = request.remote_addr
-    print(f"Incoming request from IP: {client_ip} to {request.path} with method {request.method}")
+    g.start_time = time.time()
+    # client_ip = request.remote_addr
+    # print(f"Incoming request from IP: {client_ip} to {request.path} with method {request.method}")
 
 @app.after_request
 def after_request(response):
+    # Calculate request latency
+    latency = time.time() - g.start_time
+
+    # Get request details
     endpoint = request.path
+    method = request.method
     status_code = response.status_code
     client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-    REQUEST_COUNTER.labels(endpoint=endpoint, status_code=status_code, client_ip=client_ip).inc()
-    # print(f"Request from IP: {client_ip}, Endpoint: {endpoint}, Status: {status_code}")
+    user_agent = request.headers.get('User-Agent', 'Unknown')
+
+    # Log details
+    logger.info(
+        f"IP: {client_ip}, Endpoint: {endpoint}, Method: {method}, "
+        f"Status: {status_code}, Latency: {latency:.3f}s, User-Agent: {user_agent}"
+    )
+
+    # Update Prometheus metrics
+    REQUEST_COUNTER.labels(method=method, endpoint=endpoint, status_code=status_code, client_ip=client_ip).inc()
+    LATENCY_SUMMARY.labels(endpoint=endpoint).observe(latency)
+
     return response
+    # endpoint = request.path
+    # status_code = response.status_code
+    # client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+    # REQUEST_COUNTER.labels(endpoint=endpoint, status_code=status_code, client_ip=client_ip).inc()
+    # # print(f"Request from IP: {client_ip}, Endpoint: {endpoint}, Status: {status_code}")
+    # return response
 
 class Metrics(Resource):
     def get(self):
