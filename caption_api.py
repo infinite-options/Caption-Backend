@@ -21,7 +21,7 @@ import random
 import string
 import stripe
 
-from flask import Flask, request, render_template, Response, g
+from flask import Flask, request, render_template, Response, g, jsonify
 from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_mail import Mail, Message
@@ -2632,7 +2632,7 @@ def handle_exception(e):
 
 class Metrics(Resource):
     def get(self):
-        return Response(generate_latest(), mimetype="text/plain")
+        return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
     
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
