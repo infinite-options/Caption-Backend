@@ -26,7 +26,7 @@ from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_mail import Mail, Message
 
-from prometheus_client import Counter, generate_latest, Summary
+from prometheus_client import Counter, Summary, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 import logging
 
 # from cnn_webscrape import lambda_handler
@@ -158,13 +158,19 @@ utc = pytz.utc
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
 
+registry = CollectorRegistry()
+
 REQUEST_COUNTER = Counter(
-    'capshnz_http_requests_total',
+    'http_requests_total',
     'Total HTTP requests by method, endpoint, status code, and client IP',
-    ['method', 'endpoint', 'status_code', 'client_ip']
+    ['method', 'endpoint', 'status_code', 'client_ip', 'user_agent', 'request_size', 'response_size'],
+    registry=registry
 )
 LATENCY_SUMMARY = Summary(
-    'capshnz_http_request_latency_seconds', 'Request latency by endpoint', ['endpoint']
+    'http_request_latency_seconds',
+    'Request latency by endpoint',
+    ['endpoint', 'method'],
+    registry=registry
 )
 
 
@@ -2573,18 +2579,40 @@ def after_request(response):
     endpoint = request.path
     method = request.method
     status_code = response.status_code
+
+    if method == 'OPTIONS':
+        return response
+    
     client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+
+    if client_ip == '127.0.0.1':
+        return response
+
     user_agent = request.headers.get('User-Agent', 'Unknown')
+    request_size = len(request.data) if request.data else 0
+    response_size = len(response.data) if response.data else 0
+    referer = request.headers.get('Referer', 'None')
+    payload = request.get_json(silent=True)  # Log JSON payloads if available
+    query_params = request.args.to_dict()
 
     # Log details
     logger.info(
         f"IP: {client_ip}, Endpoint: {endpoint}, Method: {method}, "
-        f"Status: {status_code}, Latency: {latency:.3f}s, User-Agent: {user_agent}"
+        f"Status Code: {status_code}, Latency: {latency:.3f}s, "
+        f"Request Size: {request_size} bytes, Response Size: {response_size} bytes, "
+        f"User-Agent: {user_agent}, Referer: {referer}, Query: {query_params}, Payload: {payload}"
     )
 
-    # Update Prometheus metrics
-    REQUEST_COUNTER.labels(method=method, endpoint=endpoint, status_code=status_code, client_ip=client_ip).inc()
-    LATENCY_SUMMARY.labels(endpoint=endpoint).observe(latency)
+    REQUEST_COUNTER.labels(
+        method=method,
+        endpoint=endpoint,
+        status_code=status_code,
+        client_ip=client_ip,
+        user_agent=user_agent,
+        request_size=request_size,
+        response_size=response_size
+    ).inc()
+    LATENCY_SUMMARY.labels(endpoint=endpoint, method=method).observe(latency)
 
     return response
     # endpoint = request.path
@@ -2593,6 +2621,12 @@ def after_request(response):
     # REQUEST_COUNTER.labels(endpoint=endpoint, status_code=status_code, client_ip=client_ip).inc()
     # # print(f"Request from IP: {client_ip}, Endpoint: {endpoint}, Status: {status_code}")
     # return response
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+    logger.error(f"Unhandled Exception: {str(e)}, IP: {client_ip}, Endpoint: {request.path}")
+    return jsonify({"error": "Internal server error"}), 500
 
 class Metrics(Resource):
     def get(self):
