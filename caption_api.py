@@ -155,24 +155,27 @@ utc = pytz.utc
 #                     ['endpoint', 'status_code', 'client_ip']
 #                 )
 
-logging.getLogger('werkzeug').setLevel(logging.ERROR)
+app_env = os.getenv("app_env")
+print(app_env)
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-logger = logging.getLogger(__name__)
+if app_env == "production":
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+    logger = logging.getLogger(__name__)
 
 registry = CollectorRegistry()
 
 REQUEST_COUNTER = Counter(
     'capshnz_http_requests_total',
     'Total HTTP requests by method, endpoint, status code, and client IP',
-    ['method', 'endpoint', 'status_code', 'client_ip', 'user_agent', 'request_size', 'response_size']
-    # registry=registry
+    ['method', 'endpoint', 'status_code', 'client_ip', 'user_agent', 'request_size', 'response_size'],
+    registry=registry
 )
 LATENCY_SUMMARY = Summary(
     'capshnz_http_request_latency_seconds',
     'Request latency by endpoint',
-    ['endpoint', 'method']
-    # registry=registry
+    ['endpoint', 'method'],
+    registry=registry
 )
 
 
@@ -2632,7 +2635,7 @@ def handle_exception(e):
 
 class Metrics(Resource):
     def get(self):
-        return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+        return Response(generate_latest(registry), mimetype=CONTENT_TYPE_LATEST)
     
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
