@@ -163,16 +163,16 @@ logger = logging.getLogger(__name__)
 registry = CollectorRegistry()
 
 REQUEST_COUNTER = Counter(
-    'http_requests_total',
+    'capshnz_http_requests_total',
     'Total HTTP requests by method, endpoint, status code, and client IP',
-    ['method', 'endpoint', 'status_code', 'client_ip', 'user_agent', 'request_size', 'response_size'],
-    registry=registry
+    ['method', 'endpoint', 'status_code', 'client_ip', 'user_agent', 'request_size', 'response_size']
+    # registry=registry
 )
 LATENCY_SUMMARY = Summary(
-    'http_request_latency_seconds',
+    'capshnz_http_request_latency_seconds',
     'Request latency by endpoint',
-    ['endpoint', 'method'],
-    registry=registry
+    ['endpoint', 'method']
+    # registry=registry
 )
 
 
