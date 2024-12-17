@@ -168,14 +168,14 @@ registry = CollectorRegistry()
 REQUEST_COUNTER = Counter(
     'capshnz_http_requests_total',
     'Total HTTP requests by method, endpoint, status code, and client IP',
-    ['method', 'endpoint', 'status_code', 'client_ip', 'user_agent', 'request_size', 'response_size'],
+    ['timestamp', 'method', 'endpoint', 'status_code', 'client_ip', 'user_agent', 'request_size', 'response_size'],
     registry=registry
 )
 
 REQUEST_COUNTER_JUST_ENDPOINT = Counter(
     'capshnz_http_request_by_ip_endpoint_total',
     'Total HTTP requests by IP and Endpoint',
-    ['client_ip', 'endpoint'],
+    ['client_ip', 'endpoint', 'timestamp'],
     registry=registry
 )
 
@@ -2577,6 +2577,11 @@ class CNNWebScrape(Resource):
             disconnect(conn)
         return response
 
+def get_pst_timestamp():
+    pst = timezone('America/Los_Angeles')
+    current_time = datetime.now(pst)
+    return current_time.strftime('%Y-%m-%d %H:%M:%S')
+
 @app.before_request
 def before_request():
     g.start_time = time.time()
@@ -2608,10 +2613,12 @@ def after_request(response):
     payload = request.get_json(silent=True)  # Log JSON payloads if available
     query_params = request.args.to_dict()
 
+    current_timestamp = get_pst_timestamp()
+
     # Log details
     logger.info(
         f"IP: {client_ip}, Endpoint: {endpoint}, Method: {method}, "
-        f"Status Code: {status_code}, Latency: {latency:.3f}s, "
+        f"Status Code: {status_code}, Timestamp: {current_timestamp}, Latency: {latency:.3f}s, "
         f"Request Size: {request_size} bytes, Response Size: {response_size} bytes, "
         f"User-Agent: {user_agent}, Query: {query_params}, Payload: {payload}"
     )
@@ -2625,10 +2632,12 @@ def after_request(response):
 
         REQUEST_COUNTER_JUST_ENDPOINT.labels(
             client_ip=client_ip,
-            endpoint=normalized_endpoint
+            endpoint=normalized_endpoint,
+            timestamp=current_timestamp
         ).inc()
 
         REQUEST_COUNTER.labels(
+            timestamp=current_timestamp,
             method=method,
             endpoint=endpoint,
             status_code=status_code,
