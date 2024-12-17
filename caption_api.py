@@ -156,7 +156,7 @@ utc = pytz.utc
 #                 )
 
 app_env = os.getenv("app_env")
-print(app_env)
+# print(app_env)
 
 if app_env == "production":
     logging.getLogger('werkzeug').setLevel(logging.ERROR)
@@ -171,6 +171,14 @@ REQUEST_COUNTER = Counter(
     ['method', 'endpoint', 'status_code', 'client_ip', 'user_agent', 'request_size', 'response_size'],
     registry=registry
 )
+
+REQUEST_COUNTER_JUST_ENDPOINT = Counter(
+    'capshnz_http_request_by_ip_endpoint_total',
+    'Total HTTP requests by IP and Endpoint',
+    ['client_ip', 'endpoint'],
+    registry=registry
+)
+
 LATENCY_SUMMARY = Summary(
     'capshnz_http_request_latency_seconds',
     'Request latency by endpoint',
@@ -1703,7 +1711,7 @@ class getScores(Resource):
 
 
 class getScoreBoard(Resource):
-    print("in getScoreBoard")
+
     def get(self, game_code, round_number):
         # print("requested game_code: ", game_code)
         # print("requested round_number:", round_number)
@@ -2596,7 +2604,7 @@ def after_request(response):
     user_agent = request.headers.get('User-Agent', 'Unknown')
     request_size = len(request.data) if request.data else 0
     response_size = len(response.data) if response.data else 0
-    referer = request.headers.get('Referer', 'None')
+    # referer = request.headers.get('Referer', 'None')
     payload = request.get_json(silent=True)  # Log JSON payloads if available
     query_params = request.args.to_dict()
 
@@ -2605,27 +2613,43 @@ def after_request(response):
         f"IP: {client_ip}, Endpoint: {endpoint}, Method: {method}, "
         f"Status Code: {status_code}, Latency: {latency:.3f}s, "
         f"Request Size: {request_size} bytes, Response Size: {response_size} bytes, "
-        f"User-Agent: {user_agent}, Referer: {referer}, Query: {query_params}, Payload: {payload}"
+        f"User-Agent: {user_agent}, Query: {query_params}, Payload: {payload}"
     )
 
-    REQUEST_COUNTER.labels(
-        method=method,
-        endpoint=endpoint,
-        status_code=status_code,
-        client_ip=client_ip,
-        user_agent=user_agent,
-        request_size=request_size,
-        response_size=response_size
-    ).inc()
-    LATENCY_SUMMARY.labels(endpoint=endpoint, method=method).observe(latency)
+    if endpoint != "/metrics":
+        endpoint_parts = endpoint.split('/')
+        if len(endpoint_parts) > 3:
+            normalized_endpoint = '/'.join(endpoint_parts[:3])
+        else:
+            normalized_endpoint = endpoint
+
+        REQUEST_COUNTER_JUST_ENDPOINT.labels(
+            client_ip=client_ip,
+            endpoint=normalized_endpoint
+        )
+
+        REQUEST_COUNTER.labels(
+            method=method,
+            endpoint=endpoint,
+            status_code=status_code,
+            client_ip=client_ip,
+            user_agent=user_agent,
+            request_size=request_size,
+            response_size=response_size
+        ).inc()
+        LATENCY_SUMMARY.labels(endpoint=endpoint, method=method).observe(latency)
 
     return response
-    # endpoint = request.path
-    # status_code = response.status_code
-    # client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-    # REQUEST_COUNTER.labels(endpoint=endpoint, status_code=status_code, client_ip=client_ip).inc()
-    # # print(f"Request from IP: {client_ip}, Endpoint: {endpoint}, Status: {status_code}")
-    # return response
+    # REQUEST_COUNTER.labels(
+    #     method=method,
+    #     endpoint=endpoint,
+    #     status_code=status_code,
+    #     client_ip=client_ip,
+    #     user_agent=user_agent,
+    #     request_size=request_size,
+    #     response_size=response_size
+    # ).inc()
+    # LATENCY_SUMMARY.labels(endpoint=endpoint, method=method).observe(latency)
 
 @app.errorhandler(Exception)
 def handle_exception(e):
