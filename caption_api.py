@@ -2616,17 +2616,17 @@ def after_request(response):
         f"User-Agent: {user_agent}, Query: {query_params}, Payload: {payload}"
     )
 
-    if endpoint != "/metrics":
+    if endpoint != "/metrics" and endpoint != "/favicon.ico":
         endpoint_parts = endpoint.split('/')
-        if len(endpoint_parts) > 3:
-            normalized_endpoint = '/'.join(endpoint_parts[:3])
+        if len(endpoint_parts) > 4:
+            normalized_endpoint = '/'.join(endpoint_parts[:4])
         else:
             normalized_endpoint = endpoint
 
         REQUEST_COUNTER_JUST_ENDPOINT.labels(
             client_ip=client_ip,
             endpoint=normalized_endpoint
-        )
+        ).inc()
 
         REQUEST_COUNTER.labels(
             method=method,
