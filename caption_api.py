@@ -26,7 +26,7 @@ from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_mail import Mail, Message
 
-from prometheus_client import Counter, Summary, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Summary, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 import logging
 
 # from cnn_webscrape import lambda_handler
@@ -165,6 +165,13 @@ if app_env == "production":
 
 registry = CollectorRegistry()
 
+API_CALLS_TRACKER = Gauge(
+    'capshnz_api_calls_timestamp',
+    'API calls with timestamp tracking',
+    ['endpoint', 'client_ip', 'timestamp'],
+    registry=registry
+)
+
 REQUEST_COUNTER = Counter(
     'capshnz_http_requests_total',
     'Total HTTP requests by method, endpoint, status code, and client IP',
@@ -172,12 +179,12 @@ REQUEST_COUNTER = Counter(
     registry=registry
 )
 
-REQUEST_COUNTER_JUST_ENDPOINT = Counter(
-    'capshnz_http_request_by_ip_endpoint_total',
-    'Total HTTP requests by IP and Endpoint',
-    ['client_ip', 'endpoint', 'timestamp'],
-    registry=registry
-)
+# REQUEST_COUNTER_JUST_ENDPOINT = Counter(
+#     'capshnz_http_request_by_ip_endpoint_total',
+#     'Total HTTP requests by IP and Endpoint',
+#     ['client_ip', 'endpoint', 'timestamp'],
+#     registry=registry
+# )
 
 LATENCY_SUMMARY = Summary(
     'capshnz_http_request_latency_seconds',
@@ -2630,11 +2637,17 @@ def after_request(response):
         else:
             normalized_endpoint = endpoint
 
-        REQUEST_COUNTER_JUST_ENDPOINT.labels(
-            client_ip=client_ip,
+        # REQUEST_COUNTER_JUST_ENDPOINT.labels(
+        #     client_ip=client_ip,
+        #     endpoint=normalized_endpoint,
+        #     timestamp=current_timestamp
+        # ).inc()
+
+        API_CALLS_TRACKER.labels(
             endpoint=normalized_endpoint,
+            client_ip=client_ip,
             timestamp=current_timestamp
-        ).inc()
+        ).set(1)
 
         REQUEST_COUNTER.labels(
             timestamp=current_timestamp,
