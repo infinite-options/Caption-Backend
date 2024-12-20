@@ -182,9 +182,15 @@ REQUEST_COUNTER = Counter(
 API_CALL_HISTORY = Counter(
     'capshnz_api_call_history',
     'API calls with timestamp tracking for each IP',
-    ['endpoint', 'client_ip', 'call_time'],
+    ['endpoint', 'client_ip'],
     registry=registry
 )
+# API_CALL_HISTORY = Counter(
+#     'capshnz_api_call_history',
+#     'API calls with timestamp tracking for each IP',
+#     ['endpoint', 'client_ip', 'call_time'],
+#     registry=registry
+# )
 
 LATENCY_SUMMARY = Summary(
     'capshnz_http_request_latency_seconds',
@@ -2640,8 +2646,7 @@ def after_request(response):
         API_CALL_HISTORY.labels(
         endpoint=normalized_endpoint,
         client_ip=client_ip,
-        call_time=current_timestamp
-    ).inc()
+        ).inc()
 
         API_CALLS_TRACKER.labels(
             endpoint=normalized_endpoint,
