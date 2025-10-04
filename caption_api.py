@@ -2806,7 +2806,7 @@ class OAuthURL(Resource):
                 params = {
                     'response_type': 'code',
                     'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
-                    'redirect_uri': os.getenv('REDIRECT_URI', 'http://localhost:4030/oauth2/callback'),
+                    'redirect_uri': os.getenv('REDIRECT_URI', 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback'),
                     'scope': ' '.join([
                         'https://www.googleapis.com/auth/userinfo.profile',
                         'https://www.googleapis.com/auth/userinfo.email',
@@ -2822,7 +2822,21 @@ class OAuthURL(Resource):
                     'prompt': 'consent',
                     'state': session_id
                 }
-                return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+                
+                # Log all parameters being sent to Google
+                print("🔗 GOOGLE OAUTH PARAMETERS:")
+                print(f"🔗 Google OAuth URL: https://accounts.google.com/o/oauth2/v2/auth")
+                print(f"🔗 Parameters being sent to Google:")
+                for key, value in params.items():
+                    if key == 'scope':
+                        print(f"🔗   {key}: {value}")
+                    else:
+                        print(f"🔗   {key}: {value}")
+                
+                auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+                print(f"🔗 Complete Google OAuth URL: {auth_url}")
+                
+                return auth_url
             
             code_verifier = generate_code_verifier()
             code_challenge = generate_code_challenge(code_verifier)
@@ -2841,7 +2855,7 @@ class OAuthURL(Resource):
             auth_url = build_auth_url(code_challenge, session_id)
             
             print(f"Generated OAuth URL for session: {session_id}")
-            print(f"Redirect URI: {os.getenv('REDIRECT_URI', 'http://localhost:4030/oauth2/callback')}")
+            print(f"Redirect URI: {os.getenv('REDIRECT_URI', 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback')}")
             
             return {
                 'authUrl': auth_url,
@@ -2853,18 +2867,18 @@ class OAuthURL(Resource):
             print(f"Error generating OAuth URL: {error}")
             return {'error': 'Failed to generate OAuth URL'}, 500
 
-class OAuthToken(Resource):
+class OAuthCallback(Resource):
     def get(self):
         """Handle OAuth callback from Google (GET request)"""
-        print("🔗 OAUTH CALLBACK ENDPOINT HIT!")
-        print(f"🔗 Request from: {request.remote_addr}")
-        print(f"🔗 User-Agent: {request.headers.get('User-Agent')}")
+        print("🔄 OAUTH CALLBACK ENDPOINT HIT!")
+        print(f"🔄 Request from: {request.remote_addr}")
+        print(f"🔄 User-Agent: {request.headers.get('User-Agent')}")
         
         try:
             code = request.args.get('code')
             state = request.args.get('state')
             
-            print(f"🔗 Query params - code: {code}, state: {state}")
+            print(f"🔄 Query params - code: {code}, state: {state}")
             
             if not code or not state:
                 print("❌ Missing code or state in query parameters")
@@ -2875,7 +2889,7 @@ class OAuthToken(Resource):
                 'code': code,
                 'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
                 'client_secret': os.getenv('REACT_APP_GOOGLE_CLIENT_SECRET_WEB'),
-                'redirect_uri': os.getenv('REDIRECT_URI', 'https://capshnz.com/api/oauth/token'),
+                'redirect_uri': request.url,  # Use current URL as redirect URI
                 'grant_type': 'authorization_code'
             }
             
@@ -2909,16 +2923,17 @@ class OAuthToken(Resource):
                 }
                 print(f"💾 Tokens stored for state: {state}")
             
-            # Redirect back to mobile app with deep link
+            # Redirect to frontend with session ID
             from flask import redirect
-            deep_link = f"capshnz://photos/done?session={state}"
-            print(f"📱 Redirecting to deep link: {deep_link}")
-            return redirect(deep_link, code=302)
+            frontend_url = f"https://capshnz.com/photos/picker?sessionId={state}"
+            print(f"🌐 Redirecting to frontend: {frontend_url}")
+            return redirect(frontend_url, code=302)
             
         except Exception as error:
             print(f"❌ Error in OAuth callback: {error}")
             return {'error': 'OAuth callback failed'}, 500
 
+class OAuthToken(Resource):
     def post(self):
         """Exchange OAuth code for tokens (for mobile apps)"""
         print("🎫 OAUTH TOKEN EXCHANGE ENDPOINT HIT!")
@@ -2988,9 +3003,102 @@ class OAuthToken(Resource):
             print(f"❌ Error exchanging code: {error}")
             return {'error': 'Token exchange failed'}, 500
 
+class PickerSelection(Resource):
+    def post(self):
+        """Store selected photos from Google Photo Picker"""
+        print("📸 PICKER SELECTION ENDPOINT HIT!")
+        print(f"📸 Request from: {request.remote_addr}")
+        print(f"📸 User-Agent: {request.headers.get('User-Agent')}")
+        
+        try:
+            data = request.get_json()
+            session_id = data.get('sessionId')
+            selected_photos = data.get('photos', [])
+            
+            print(f"📸 Session ID: {session_id}")
+            print(f"📸 Selected photos count: {len(selected_photos)}")
+            print(f"📸 Photos data: {json.dumps(selected_photos, indent=2)}")
+            
+            if not session_id:
+                print("❌ Missing sessionId in request")
+                return {'error': 'Missing sessionId'}, 400
+            
+            if not selected_photos:
+                print("❌ No photos selected")
+                return {'error': 'No photos selected'}, 400
+            
+            # Store selected photos temporarily using the session ID
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            if session_id in active_sessions:
+                active_sessions[session_id]['selected_photos'] = selected_photos
+                active_sessions[session_id]['timestamp'] = time.time()
+                print(f"💾 Photos stored for session: {session_id}")
+            else:
+                print(f"❌ Session not found: {session_id}")
+                return {'error': 'Invalid session'}, 400
+            
+            # Return success response with deep link for frontend
+            return {
+                'success': True,
+                'message': f'Successfully stored {len(selected_photos)} photos',
+                'sessionId': session_id,
+                'photoCount': len(selected_photos),
+                'deepLink': f"googleapidemo://photos/selection?sessionId={session_id}"
+            }
+            
+        except Exception as error:
+            print(f"❌ Error storing photos: {error}")
+            return {'error': 'Failed to store photos'}, 500
+
+class PickerResult(Resource):
+    def get(self):
+        """Get selected photos for a session"""
+        print("📋 PICKER RESULT ENDPOINT HIT!")
+        print(f"📋 Request from: {request.remote_addr}")
+        print(f"📋 User-Agent: {request.headers.get('User-Agent')}")
+        
+        try:
+            session_id = request.args.get('sessionId')
+            
+            print(f"📋 Session ID: {session_id}")
+            
+            if not session_id:
+                print("❌ Missing sessionId parameter")
+                return {'error': 'Missing sessionId parameter'}, 400
+            
+            # Retrieve selected photos for the session
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            session = active_sessions.get(session_id)
+            if not session:
+                print(f"❌ Session not found: {session_id}")
+                return {'error': 'Session not found'}, 404
+            
+            selected_photos = session.get('selected_photos', [])
+            print(f"📋 Retrieved {len(selected_photos)} photos for session: {session_id}")
+            
+            return {
+                'success': True,
+                'sessionId': session_id,
+                'photos': selected_photos,
+                'photoCount': len(selected_photos)
+            }
+            
+        except Exception as error:
+            print(f"❌ Error retrieving photos: {error}")
+            return {'error': 'Failed to retrieve photos'}, 500
+
 # Register photo-picker resources
 api.add_resource(OAuthURL, "/api/oauth/url")
+api.add_resource(OAuthCallback, "/api/oauth/callback")
 api.add_resource(OAuthToken, "/api/oauth/token")
+api.add_resource(PickerSelection, "/api/picker/selection")
+api.add_resource(PickerResult, "/api/picker/result")
 print("✅ Photo-picker resources registered successfully")
 
 if __name__ == "__main__":
