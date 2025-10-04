@@ -12,6 +12,9 @@ import uuid
 import boto3
 import json
 import math
+import hashlib
+import base64
+from urllib.parse import urlencode
 
 from datetime import time, date, datetime, timedelta
 import calendar
@@ -2681,7 +2684,7 @@ def after_request(response):
 @app.errorhandler(Exception)
 def handle_exception(e):
     client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-    logger.error(f"Unhandled Exception: {str(e)}, IP: {client_ip}, Endpoint: {request.path}")
+    print(f"Unhandled Exception: {str(e)}, IP: {client_ip}, Endpoint: {request.path}")
     return jsonify({"error": "Internal server error"}), 500
 
 class Metrics(Resource):
@@ -2747,5 +2750,105 @@ api.add_resource(Metrics, "/metrics")
 api.add_resource(CNNWebScrape , "/api/v2/cnn_webscrape")
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
+# Add health endpoint directly
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    import time as time_module
+    return {
+        'status': 'OK',
+        'timestamp': datetime.now().isoformat(),
+        'uptime': time_module.time(),
+        'message': 'Caption API is running'
+    }
+
+# Add test endpoint directly
+@app.route('/test', methods=['GET'])
+def test_endpoint():
+    """Test endpoint for debugging"""
+    print("🧪 TEST ENDPOINT HIT!")
+    print(f"🧪 Request from: {request.remote_addr}")
+    print(f"🧪 User-Agent: {request.headers.get('User-Agent')}")
+    return {
+        'message': 'Caption API is accessible!',
+        'timestamp': datetime.now().isoformat(),
+        'ip': request.remote_addr
+    }
+
+# Photo-picker Resource classes
+class OAuthURL(Resource):
+    def get(self):
+        """Get OAuth URL for Google authentication"""
+        print("🔐 OAUTH URL ENDPOINT HIT!")
+        print(f"🔐 Request from: {request.remote_addr}")
+        print(f"🔐 User-Agent: {request.headers.get('User-Agent')}")
+        try:
+            def base64url_encode(buffer):
+                return base64.b64encode(buffer).decode('utf-8').replace('+', '-').replace('/', '_').replace('=', '')
+            
+            def generate_code_verifier():
+                return base64url_encode(os.urandom(32))
+            
+            def generate_code_challenge(verifier):
+                return base64url_encode(hashlib.sha256(verifier.encode('utf-8')).digest())
+            
+            def build_auth_url(code_challenge, session_id):
+                params = {
+                    'response_type': 'code',
+                    'client_id': os.getenv('GOOGLE_CLIENT_ID'),
+                    'redirect_uri': os.getenv('REDIRECT_URI', 'http://localhost:4030/oauth2/callback'),
+                    'scope': ' '.join([
+                        'https://www.googleapis.com/auth/userinfo.profile',
+                        'https://www.googleapis.com/auth/userinfo.email',
+                        'https://www.googleapis.com/auth/drive.readonly',
+                        'https://www.googleapis.com/auth/calendar.readonly',
+                        'https://www.googleapis.com/auth/photoslibrary.readonly',
+                        'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
+                    ]),
+                    'code_challenge': code_challenge,
+                    'code_challenge_method': 'S256',
+                    'include_granted_scopes': 'true',
+                    'access_type': 'offline',
+                    'prompt': 'consent',
+                    'state': session_id
+                }
+                return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+            
+            code_verifier = generate_code_verifier()
+            code_challenge = generate_code_challenge(code_verifier)
+            
+            # Store code verifier for later use
+            session_id = str(uuid.uuid4())
+            # Note: In production, use Redis or database instead of global variable
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            active_sessions[session_id] = {
+                'code_verifier': code_verifier,
+                'timestamp': time.time()
+            }
+            
+            auth_url = build_auth_url(code_challenge, session_id)
+            
+            print(f"Generated OAuth URL for session: {session_id}")
+            print(f"Redirect URI: {os.getenv('REDIRECT_URI', 'http://localhost:4030/oauth2/callback')}")
+            
+            return {
+                'authUrl': auth_url,
+                'sessionId': session_id,
+                'expiresIn': 600,  # 10 minutes
+                'message': 'Use this URL for OAuth flow'
+            }
+        except Exception as error:
+            print(f"Error generating OAuth URL: {error}")
+            return {'error': 'Failed to generate OAuth URL'}, 500
+
+# Register photo-picker resources
+api.add_resource(OAuthURL, "/api/oauth/url")
+print("✅ Photo-picker resources registered successfully")
+
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=4030)
+    print("🚀 Starting Caption API with Photo-Picker Integration")
+    print("📱 Ready for both web and mobile apps")
+    print("🏥 Health endpoint: http://127.0.0.1:4030/health")
+    app.run(host="127.0.0.1", port=4030, debug=True)
