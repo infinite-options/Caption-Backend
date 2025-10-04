@@ -30,7 +30,6 @@ from flask_cors import CORS
 from flask_mail import Mail, Message
 
 from prometheus_client import Counter, Summary, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
-import logging
 
 # from cnn_webscrape import lambda_handler
 # used for serializer email and error handling
@@ -162,9 +161,8 @@ app_env = os.getenv("app_env")
 # print(app_env)
 
 if app_env == "production":
-    logging.getLogger('werkzeug').setLevel(logging.ERROR)
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-    logger = logging.getLogger(__name__)
+    # Logging disabled - using print statements instead
+    pass
 
 registry = CollectorRegistry()
 
@@ -2632,12 +2630,8 @@ def after_request(response):
     current_timestamp = get_pst_timestamp()
 
     # Log details
-    logger.info(
-        f"IP: {client_ip}, Endpoint: {endpoint}, Method: {method}, "
-        f"Status Code: {status_code}, Timestamp: {current_timestamp}, Latency: {latency:.3f}s, "
-        f"Request Size: {request_size} bytes, Response Size: {response_size} bytes, "
-        f"User-Agent: {user_agent}, Query: {query_params}, Payload: {payload}"
-    )
+    print(f"API Call - IP: {client_ip}, Endpoint: {endpoint}, Method: {method}, Status: {status_code}, Latency: {latency:.3f}s")
+    print(f"User-Agent: {user_agent}, Query: {query_params}, Payload: {payload}")
 
     if endpoint != "/metrics" and endpoint != "/favicon.ico":
         endpoint_parts = endpoint.split('/')
@@ -2750,6 +2744,22 @@ api.add_resource(Metrics, "/metrics")
 api.add_resource(CNNWebScrape , "/api/v2/cnn_webscrape")
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
+# Add root endpoint
+@app.route('/', methods=['GET'])
+def root():
+    """Root endpoint - redirect to health or show API info"""
+    return {
+        'message': 'Caption API is running',
+        'status': 'OK',
+        'timestamp': datetime.now().isoformat(),
+        'endpoints': {
+            'health': '/health',
+            'test': '/test',
+            'oauth_url': '/api/oauth/url',
+            'api_docs': 'All /api/v2/* endpoints available'
+        }
+    }
+
 # Add health endpoint directly
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -2795,7 +2805,7 @@ class OAuthURL(Resource):
             def build_auth_url(code_challenge, session_id):
                 params = {
                     'response_type': 'code',
-                    'client_id': os.getenv('GOOGLE_CLIENT_ID'),
+                    'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
                     'redirect_uri': os.getenv('REDIRECT_URI', 'http://localhost:4030/oauth2/callback'),
                     'scope': ' '.join([
                         'https://www.googleapis.com/auth/userinfo.profile',
@@ -2843,8 +2853,144 @@ class OAuthURL(Resource):
             print(f"Error generating OAuth URL: {error}")
             return {'error': 'Failed to generate OAuth URL'}, 500
 
+class OAuthToken(Resource):
+    def get(self):
+        """Handle OAuth callback from Google (GET request)"""
+        print("🔗 OAUTH CALLBACK ENDPOINT HIT!")
+        print(f"🔗 Request from: {request.remote_addr}")
+        print(f"🔗 User-Agent: {request.headers.get('User-Agent')}")
+        
+        try:
+            code = request.args.get('code')
+            state = request.args.get('state')
+            
+            print(f"🔗 Query params - code: {code}, state: {state}")
+            
+            if not code or not state:
+                print("❌ Missing code or state in query parameters")
+                return {'error': 'Missing code or state'}, 400
+            
+            # Exchange code for tokens with Google
+            token_data = {
+                'code': code,
+                'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
+                'client_secret': os.getenv('REACT_APP_GOOGLE_CLIENT_SECRET_WEB'),
+                'redirect_uri': os.getenv('REDIRECT_URI', 'https://capshnz.com/api/oauth/token'),
+                'grant_type': 'authorization_code'
+            }
+            
+            print("🌐 Making request to Google OAuth token endpoint")
+            print(f"🔗 URL: https://oauth2.googleapis.com/token")
+            
+            import requests
+            response = requests.post(
+                'https://oauth2.googleapis.com/token',
+                data=token_data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            )
+            
+            if response.status_code != 200:
+                print(f"❌ Google token exchange failed: {response.text}")
+                return {'error': 'Token exchange failed'}, 500
+            
+            tokens = response.json()
+            print("✅ Successfully exchanged code for tokens")
+            print(f"🔑 Tokens received: {json.dumps(tokens, indent=2)}")
+            
+            # Store tokens with state for later retrieval
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            if state:
+                active_sessions[state] = {
+                    'tokens': tokens,
+                    'timestamp': time.time()
+                }
+                print(f"💾 Tokens stored for state: {state}")
+            
+            # Redirect back to mobile app with deep link
+            from flask import redirect
+            deep_link = f"capshnz://photos/done?session={state}"
+            print(f"📱 Redirecting to deep link: {deep_link}")
+            return redirect(deep_link, code=302)
+            
+        except Exception as error:
+            print(f"❌ Error in OAuth callback: {error}")
+            return {'error': 'OAuth callback failed'}, 500
+
+    def post(self):
+        """Exchange OAuth code for tokens (for mobile apps)"""
+        print("🎫 OAUTH TOKEN EXCHANGE ENDPOINT HIT!")
+        print(f"🎫 Request from: {request.remote_addr}")
+        print(f"🎫 User-Agent: {request.headers.get('User-Agent')}")
+        
+        try:
+            data = request.get_json()
+            code = data.get('code')
+            state = data.get('state')
+            
+            print(f"🎫 Request body: {json.dumps(data, indent=2)}")
+            
+            if not code:
+                print("❌ Missing code in request")
+                return {'error': 'Missing code'}, 400
+            
+            # Get stored code verifier
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            session = active_sessions.get(state)
+            if not session:
+                print("❌ Invalid or expired state parameter")
+                return {'error': 'Invalid or expired session'}, 400
+            
+            # Exchange code for tokens
+            token_data = {
+                'code': code,
+                'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
+                'client_secret': os.getenv('REACT_APP_GOOGLE_CLIENT_SECRET_WEB'),
+                'redirect_uri': os.getenv('REDIRECT_URI', 'http://localhost:4030/oauth2/callback'),
+                'grant_type': 'authorization_code',
+                'code_verifier': session['code_verifier']
+            }
+            
+            print("🌐 Making request to Google OAuth token endpoint")
+            print(f"🔗 URL: https://oauth2.googleapis.com/token")
+            
+            import requests
+            response = requests.post(
+                'https://oauth2.googleapis.com/token',
+                data=token_data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            )
+            
+            if response.status_code != 200:
+                print(f"❌ Token exchange failed: {response.text}")
+                return {'error': 'Token exchange failed', 'details': response.text}, 500
+            
+            tokens = response.json()
+            print("✅ Successfully exchanged code for tokens")
+            print(f"🔑 Tokens received: {json.dumps(tokens, indent=2)}")
+            
+            # Store tokens with state for later retrieval
+            if state:
+                active_sessions[state].update({
+                    'tokens': tokens,
+                    'timestamp': time.time()
+                })
+                print(f"💾 Tokens stored for state: {state}")
+            
+            return {'success': True, **tokens}
+            
+        except Exception as error:
+            print(f"❌ Error exchanging code: {error}")
+            return {'error': 'Token exchange failed'}, 500
+
 # Register photo-picker resources
 api.add_resource(OAuthURL, "/api/oauth/url")
+api.add_resource(OAuthToken, "/api/oauth/token")
 print("✅ Photo-picker resources registered successfully")
 
 if __name__ == "__main__":
