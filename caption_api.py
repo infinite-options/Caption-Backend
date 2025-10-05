@@ -2808,6 +2808,24 @@ def test_token_endpoint():
     print(f"🧪 Test response: {json.dumps(response_data, indent=2)}")
     return response_data
 
+# Helper function for environment detection
+def get_redirect_uri():
+    """Determine the correct redirect URI based on the current environment"""
+    is_local = (
+        request.host and (
+            'localhost' in request.host or 
+            '127.0.0.1' in request.host or
+            request.host.startswith('10.0.2.2') or  # Android emulator
+            request.host.startswith('192.168.') or  # Local network
+            request.host.startswith('172.')  # Docker/VM
+        )
+    )
+    
+    if is_local:
+        return os.getenv('REDIRECT_URI_LOCAL', 'http://localhost:4030/api/oauth/callback'), is_local
+    else:
+        return os.getenv('REDIRECT_URI', 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback'), is_local
+
 # Photo-picker Resource classes
 class OAuthURL(Resource):
     def get(self):
@@ -2826,10 +2844,13 @@ class OAuthURL(Resource):
                 return base64url_encode(hashlib.sha256(verifier.encode('utf-8')).digest())
             
             def build_auth_url(code_challenge, session_id):
+                # Determine redirect URI based on environment
+                redirect_uri, is_local = get_redirect_uri()
+                
                 params = {
                     'response_type': 'code',
                     'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
-                    'redirect_uri': os.getenv('REDIRECT_URI', 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback'),
+                    'redirect_uri': redirect_uri,
                     'scope': ' '.join([
                         'https://www.googleapis.com/auth/userinfo.profile',
                         'https://www.googleapis.com/auth/userinfo.email',
@@ -2875,10 +2896,14 @@ class OAuthURL(Resource):
                 'timestamp': time.time()
             }
             
+            # Determine redirect URI for logging
+            redirect_uri, is_local = get_redirect_uri()
+            
             auth_url = build_auth_url(code_challenge, session_id)
             
             print(f"Generated OAuth URL for session: {session_id}")
-            print(f"Redirect URI: {os.getenv('REDIRECT_URI', 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback')}")
+            print(f"🔧 Mode: {'LOCAL' if is_local else 'PRODUCTION'}")
+            print(f"🔧 Redirect URI: {redirect_uri}")
             
             return {
                 'authUrl': auth_url,
@@ -2923,8 +2948,8 @@ class OAuthCallback(Resource):
                 return {'error': 'Missing code verifier'}, 400
             
             # Exchange code for tokens with Google (using PKCE)
-            # Use the configured redirect URI from environment variable
-            redirect_uri = os.getenv('REDIRECT_URI', 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback')
+            # Use dynamic redirect URI based on environment
+            redirect_uri, is_local = get_redirect_uri()
             token_data = {
                 'code': code,
                 'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
@@ -3219,4 +3244,10 @@ if __name__ == "__main__":
     print("🚀 Starting Caption API with Photo-Picker Integration")
     print("📱 Ready for both web and mobile apps")
     print("🏥 Health endpoint: http://127.0.0.1:4030/health")
+    
+    # Detect environment and show configuration
+    print("\n🔧 ENVIRONMENT DETECTION:")
+    print("🔧 Mode: LOCAL DEVELOPMENT")
+    print(f"🔧 Redirect URI: {os.getenv('REDIRECT_URI_LOCAL', 'http://localhost:4030/api/oauth/callback')}")
+    
     app.run(host="127.0.0.1", port=4030, debug=True)
