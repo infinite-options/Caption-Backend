@@ -2785,6 +2785,29 @@ def test_endpoint():
         'ip': request.remote_addr
     }
 
+@app.route('/api/oauth/token-test', methods=['GET'])
+def test_token_endpoint():
+    """Test endpoint to verify token response format"""
+    print("🧪 TEST TOKEN ENDPOINT HIT!")
+    
+    # Create a mock response similar to what the real endpoint returns
+    mock_tokens = {
+        'access_token': 'ya29.test_access_token_12345',
+        'refresh_token': '1//test_refresh_token_67890',
+        'scope': 'https://www.googleapis.com/auth/photoslibrary.readonly',
+        'token_type': 'Bearer',
+        'expires_in': 3599
+    }
+    
+    response_data = {
+        'success': True,
+        'sessionId': 'test-session-123',
+        'tokens': mock_tokens
+    }
+    
+    print(f"🧪 Test response: {json.dumps(response_data, indent=2)}")
+    return response_data
+
 # Photo-picker Resource classes
 class OAuthURL(Resource):
     def get(self):
@@ -2884,17 +2907,41 @@ class OAuthCallback(Resource):
                 print("❌ Missing code or state in query parameters")
                 return {'error': 'Missing code or state'}, 400
             
-            # Exchange code for tokens with Google
+            # Get stored code verifier for PKCE
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            session = active_sessions.get(state)
+            if not session:
+                print(f"❌ Session not found for state: {state}")
+                return {'error': 'Invalid or expired session'}, 400
+            
+            code_verifier = session.get('code_verifier')
+            if not code_verifier:
+                print(f"❌ Code verifier not found for session: {state}")
+                return {'error': 'Missing code verifier'}, 400
+            
+            # Exchange code for tokens with Google (using PKCE)
+            # Use the configured redirect URI from environment variable
+            redirect_uri = os.getenv('REDIRECT_URI', 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback')
             token_data = {
                 'code': code,
                 'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
                 'client_secret': os.getenv('REACT_APP_GOOGLE_CLIENT_SECRET_WEB'),
-                'redirect_uri': request.url,  # Use current URL as redirect URI
-                'grant_type': 'authorization_code'
+                'redirect_uri': redirect_uri,  # Use configured redirect URI
+                'grant_type': 'authorization_code',
+                'code_verifier': code_verifier  # Add PKCE code verifier
             }
             
             print("🌐 Making request to Google OAuth token endpoint")
             print(f"🔗 URL: https://oauth2.googleapis.com/token")
+            print(f"🔗 Token data being sent to Google:")
+            for key, value in token_data.items():
+                if key == 'code_verifier':
+                    print(f"🔗   {key}: {value[:10]}...{value[-10:] if len(value) > 20 else value}")
+                else:
+                    print(f"🔗   {key}: {value}")
             
             import requests
             response = requests.post(
@@ -2912,9 +2959,11 @@ class OAuthCallback(Resource):
             print(f"🔑 Tokens received: {json.dumps(tokens, indent=2)}")
             
             # Store tokens with state for later retrieval
-            global active_sessions
             if 'active_sessions' not in globals():
                 active_sessions = {}
+            
+            print(f"🔍 DEBUG: About to store tokens for state: {state}")
+            print(f"🔍 DEBUG: Current active_sessions before storing: {list(active_sessions.keys())}")
             
             if state:
                 active_sessions[state] = {
@@ -2922,6 +2971,11 @@ class OAuthCallback(Resource):
                     'timestamp': time.time()
                 }
                 print(f"💾 Tokens stored for state: {state}")
+                print(f"💾 Stored tokens: {json.dumps(tokens, indent=2)}")
+                print(f"💾 Active sessions now contains: {list(active_sessions.keys())}")
+                print(f"💾 Session data stored: {json.dumps(active_sessions[state], indent=2)}")
+            else:
+                print(f"❌ No state provided, cannot store tokens")
             
             # Redirect to frontend with session ID
             from flask import redirect
@@ -2934,6 +2988,66 @@ class OAuthCallback(Resource):
             return {'error': 'OAuth callback failed'}, 500
 
 class OAuthToken(Resource):
+    def get(self, session_id=None):
+        """Get stored tokens for a session (GET request)"""
+        print("🔑 OAUTH TOKEN RETRIEVAL ENDPOINT HIT!")
+        print(f"🔑 Request from: {request.remote_addr}")
+        print(f"🔑 User-Agent: {request.headers.get('User-Agent')}")
+        
+        try:
+            # Get session ID from URL path or query parameter
+            if not session_id:
+                session_id = request.args.get('sessionId')
+            
+            print(f"🔑 Session ID: {session_id}")
+            
+            if not session_id:
+                print("❌ Missing sessionId")
+                return {'error': 'Missing sessionId'}, 400
+            
+            # Retrieve tokens for the session
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            print(f"🔍 DEBUG: Looking for session: {session_id}")
+            print(f"🔍 DEBUG: Available sessions: {list(active_sessions.keys())}")
+            print(f"🔍 DEBUG: Total sessions count: {len(active_sessions)}")
+            
+            session = active_sessions.get(session_id)
+            if not session:
+                print(f"❌ Session not found: {session_id}")
+                print(f"❌ Available sessions: {list(active_sessions.keys())}")
+                return {'error': 'Session not found'}, 404
+            
+            print(f"✅ Session found: {session_id}")
+            print(f"🔍 DEBUG: Session data keys: {list(session.keys())}")
+            
+            tokens = session.get('tokens')
+            if not tokens:
+                print(f"❌ No tokens found for session: {session_id}")
+                print(f"❌ Session contains: {list(session.keys())}")
+                return {'error': 'No tokens found'}, 404
+            
+            print(f"✅ Retrieved tokens for session: {session_id}")
+            print(f"🔑 Tokens being returned: {json.dumps(tokens, indent=2)}")
+            
+            response_data = {
+                'success': True,
+                'sessionId': session_id,
+                'tokens': tokens
+            }
+            
+            print(f"🔑 Full response being returned: {json.dumps(response_data, indent=2)}")
+            print(f"🔑 Response size: {len(json.dumps(response_data))} bytes")
+            print(f"🔑 Response status: 200 OK")
+            print(f"🔑 Response headers: Content-Type: application/json")
+            return response_data
+            
+        except Exception as error:
+            print(f"❌ Error retrieving tokens: {error}")
+            return {'error': 'Failed to retrieve tokens'}, 500
+
     def post(self):
         """Exchange OAuth code for tokens (for mobile apps)"""
         print("🎫 OAUTH TOKEN EXCHANGE ENDPOINT HIT!")
@@ -3096,7 +3210,7 @@ class PickerResult(Resource):
 # Register photo-picker resources
 api.add_resource(OAuthURL, "/api/oauth/url")
 api.add_resource(OAuthCallback, "/api/oauth/callback")
-api.add_resource(OAuthToken, "/api/oauth/token")
+api.add_resource(OAuthToken, "/api/oauth/token", "/api/oauth/token/<string:session_id>")
 api.add_resource(PickerSelection, "/api/picker/selection")
 api.add_resource(PickerResult, "/api/picker/result")
 print("✅ Photo-picker resources registered successfully")
