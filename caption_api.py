@@ -2794,7 +2794,7 @@ def test_token_endpoint():
     mock_tokens = {
         'access_token': 'ya29.test_access_token_12345',
         'refresh_token': '1//test_refresh_token_67890',
-        'scope': 'https://www.googleapis.com/auth/photoslibrary.readonly',
+        'scope': 'https://www.googleapis.com/auth/photospicker.mediaitems.readonly',
         'token_type': 'Bearer',
         'expires_in': 3599
     }
@@ -2856,7 +2856,6 @@ class OAuthURL(Resource):
                         'https://www.googleapis.com/auth/userinfo.email',
                         'https://www.googleapis.com/auth/drive.readonly',
                         'https://www.googleapis.com/auth/calendar.readonly',
-                        'https://www.googleapis.com/auth/photoslibrary.readonly',
                         'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
                     ]),
                     'code_challenge': code_challenge,
