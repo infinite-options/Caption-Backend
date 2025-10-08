@@ -2758,6 +2758,9 @@ def root():
         'endpoints': {
             'health': '/api/health',
             'oauth': '/api/oauth/url',
+            'oauth_mobile': '/api/oauth/url/mobile',
+            'oauth_mobile_direct': '/api/oauth/mobile-url',
+            'oauth_mobile_token': '/api/oauth/mobile-token',
             'user_profile': '/api/user/profile',
             'photo_picker': '/api/photos/picker/session',
             'drive_files': '/api/drive/files',
@@ -2785,11 +2788,54 @@ def get_oauth_url():
         
         # Store code verifier for later use
         session_id = str(uuid.uuid4())
+        user_agent = request.headers.get('User-Agent', 'unknown')
+        
+        # Check platform and determine appropriate redirect URI
+        platform = request.args.get('platform', '').lower()
+        client = request.args.get('client', '').lower()
+        
+        # Detect platform from User-Agent if not specified
+        if not platform and not client:
+            if 'ReactNative' in user_agent or 'Expo' in user_agent:
+                # Try to detect specific platform from User-Agent
+                if 'Android' in user_agent:
+                    platform = 'android'
+                elif 'iPhone' in user_agent or 'iPad' in user_agent:
+                    platform = 'ios'
+                else:
+                    platform = 'react-native'  # Generic React Native
+        
+        # Store session with platform info
         active_sessions[session_id] = {
             'code_verifier': code_verifier,
             'timestamp': datetime.now().timestamp(),
-            'user_agent': request.headers.get('User-Agent', 'unknown')
+            'user_agent': user_agent,
+            'platform': platform  # Store platform for later use in callback
         }
+        
+        # Determine redirect URI based on client type
+        redirect_uri = REDIRECT_URI  # Default to web redirect
+        
+        # Determine redirect URI based on platform
+        if platform == 'web':
+            # Web platform - use web redirect URI
+            redirect_uri = REDIRECT_URI
+            print(f"🌐 Using web redirect URI: {redirect_uri}")
+        elif platform == 'android':
+            # Android React Native - use AWS API Gateway URL
+            redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
+            print(f"🤖 Using Android redirect URI: {redirect_uri}")
+        elif platform == 'ios':
+            # iOS React Native - use AWS API Gateway URL
+            redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
+            print(f"📱 Using iOS redirect URI: {redirect_uri}")
+        elif platform in ['react-native'] or client == 'react-native':
+            # Generic React Native - use AWS API Gateway URL
+            redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
+            print(f"📱 Using React Native redirect URI: {redirect_uri}")
+        else:
+            # Default to web for unknown platforms
+            print(f"🌐 Using default web redirect URI: {redirect_uri}")
         
         scopes = [
             'https://www.googleapis.com/auth/userinfo.profile',
@@ -2804,7 +2850,7 @@ def get_oauth_url():
             f"https://accounts.google.com/o/oauth2/v2/auth?"
             f"response_type=code&"
             f"client_id={GOOGLE_CLIENT_ID}&"
-            f"redirect_uri={REDIRECT_URI}&"
+            f"redirect_uri={redirect_uri}&"
             f"scope={' '.join(scopes)}&"
             f"code_challenge={code_challenge}&"
             f"code_challenge_method=S256&"
@@ -2817,6 +2863,8 @@ def get_oauth_url():
         return jsonify({
             'authUrl': auth_url,
             'sessionId': session_id,
+            'redirectUri': redirect_uri,
+            'platform': platform,
             'message': 'Use this URL for OAuth flow',
             'expiresIn': 600  # 10 minutes
         })
@@ -2824,6 +2872,180 @@ def get_oauth_url():
     except Exception as e:
         print(f"Error generating OAuth URL: {e}")
         return jsonify({'error': 'Failed to generate OAuth URL'}), 500
+
+@app.route('/api/oauth/url/mobile', methods=['GET'])
+def get_oauth_url_mobile():
+    """Get OAuth URL specifically for React Native mobile"""
+    try:
+        code_verifier = generate_code_verifier()
+        code_challenge = generate_code_challenge(code_verifier)
+        
+        # Store code verifier for later use
+        session_id = str(uuid.uuid4())
+        user_agent = request.headers.get('User-Agent', 'unknown')
+        
+        active_sessions[session_id] = {
+            'code_verifier': code_verifier,
+            'timestamp': datetime.now().timestamp(),
+            'user_agent': user_agent
+        }
+        
+        # Always use React Native redirect URI for this endpoint
+        redirect_uri = "googleapidemo://photos/selection"
+        print(f"📱 Using React Native redirect URI: {redirect_uri}")
+        
+        scopes = [
+            'https://www.googleapis.com/auth/userinfo.profile',
+            'https://www.googleapis.com/auth/userinfo.email',
+            'https://www.googleapis.com/auth/drive.readonly',
+            'https://www.googleapis.com/auth/calendar.readonly',
+            'https://www.googleapis.com/auth/photoslibrary.readonly',
+            'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
+        ]
+        
+        auth_url = (
+            f"https://accounts.google.com/o/oauth2/v2/auth?"
+            f"response_type=code&"
+            f"client_id={GOOGLE_CLIENT_ID}&"
+            f"redirect_uri={redirect_uri}&"
+            f"scope={' '.join(scopes)}&"
+            f"code_challenge={code_challenge}&"
+            f"code_challenge_method=S256&"
+            f"include_granted_scopes=true&"
+            f"access_type=offline&"
+            f"prompt=consent&"
+            f"state={session_id}"
+        )
+        
+        return jsonify({
+            'authUrl': auth_url,
+            'sessionId': session_id,
+            'redirectUri': redirect_uri,
+            'platform': 'react-native',
+            'message': 'Use this URL for React Native OAuth flow',
+            'expiresIn': 600  # 10 minutes
+        })
+        
+    except Exception as e:
+        print(f"Error generating mobile OAuth URL: {e}")
+        return jsonify({'error': 'Failed to generate mobile OAuth URL'}), 500
+
+@app.route('/api/oauth/mobile-url', methods=['GET'])
+def get_mobile_oauth_url():
+    """Get OAuth URL for React Native mobile apps (direct authentication)"""
+    try:
+        # Generate PKCE parameters
+        code_verifier = generate_code_verifier()
+        code_challenge = generate_code_challenge(code_verifier)
+        
+        # Generate session ID
+        session_id = str(uuid.uuid4())
+        
+        # Store session for later token exchange
+        active_sessions[session_id] = {
+            'code_verifier': code_verifier,
+            'timestamp': datetime.now().timestamp(),
+            'user_agent': request.headers.get('User-Agent', 'unknown'),
+            'platform': 'mobile'
+        }
+        
+        # Scopes for mobile
+        scopes = [
+            'https://www.googleapis.com/auth/userinfo.profile',
+            'https://www.googleapis.com/auth/userinfo.email',
+            'https://www.googleapis.com/auth/drive.readonly',
+            'https://www.googleapis.com/auth/calendar.readonly',
+            'https://www.googleapis.com/auth/photoslibrary.readonly',
+            'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
+        ]
+        
+        # Use AWS API Gateway redirect URI (works for all platforms)
+        redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
+        
+        # Build OAuth URL
+        auth_url = (
+            f"https://accounts.google.com/o/oauth2/v2/auth?"
+            f"response_type=code&"
+            f"client_id={GOOGLE_CLIENT_ID}&"
+            f"redirect_uri={redirect_uri}&"
+            f"scope={' '.join(scopes)}&"
+            f"code_challenge={code_challenge}&"
+            f"code_challenge_method=S256&"
+            f"include_granted_scopes=true&"
+            f"access_type=offline&"
+            f"prompt=consent&"
+            f"state={session_id}"
+        )
+        
+        return jsonify({
+            'authUrl': auth_url,
+            'sessionId': session_id,
+            'redirectUri': redirect_uri,
+            'codeVerifier': code_verifier,  # Frontend needs this for token exchange
+            'platform': 'mobile',
+            'message': 'Use this URL for direct mobile OAuth flow',
+            'expiresIn': 600
+        })
+        
+    except Exception as e:
+        print(f"Error generating mobile OAuth URL: {e}")
+        return jsonify({'error': 'Failed to generate mobile OAuth URL'}), 500
+
+@app.route('/api/oauth/mobile-token', methods=['POST'])
+def exchange_mobile_token():
+    """Exchange code for token (mobile direct authentication)"""
+    try:
+        data = request.get_json() or {}
+        code = data.get('code')
+        session_id = data.get('sessionId')
+        code_verifier = data.get('codeVerifier')
+        
+        if not code or not session_id or not code_verifier:
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        # Verify session exists
+        session = active_sessions.get(session_id)
+        if not session:
+            return jsonify({'error': 'Invalid or expired session'}), 400
+        
+        # Exchange code for token using PKCE
+        token_data = {
+            'client_id': GOOGLE_CLIENT_ID,
+            'code': code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback',
+            'code_verifier': code_verifier
+        }
+        
+        response = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data=token_data,
+            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+        )
+        
+        if response.status_code != 200:
+            return jsonify({'error': 'Token exchange failed', 'details': response.text}), 500
+        
+        tokens = response.json()
+        
+        # Store tokens in session
+        active_sessions[session_id]['tokens'] = tokens
+        
+        return jsonify({
+            'success': True,
+            'sessionId': session_id,
+            'tokens': {
+                'access_token': tokens['access_token'],
+                'refresh_token': tokens.get('refresh_token'),
+                'expires_in': tokens['expires_in'],
+                'scope': tokens.get('scope'),
+                'token_type': tokens.get('token_type')
+            }
+        })
+        
+    except Exception as e:
+        print(f"Mobile token exchange error: {e}")
+        return jsonify({'error': 'Token exchange failed', 'details': str(e)}), 500
 
 @app.route('/api/oauth/token', methods=['POST'])
 def exchange_code_for_token():
@@ -2961,9 +3183,26 @@ def oauth_callback():
         else:
             print("❌ No state provided, cannot store tokens")
         
-        # Redirect to frontend with session ID
-        redirect_url = f"{FRONTEND_URL}?sessionId={state}&success=true"
-        print(f"🌐 Redirecting to frontend: {redirect_url}")
+        # Determine redirect URL based on the original request
+        session = active_sessions.get(state, {})
+        user_agent = session.get('user_agent', '')
+        
+        # Get the platform from the stored session (if available)
+        # We can store platform info in the session when creating the OAuth URL
+        platform = session.get('platform', 'web')
+        
+        if platform == 'web':
+            # For web, redirect to frontend URL
+            redirect_url = f"{FRONTEND_URL}?sessionId={state}&success=true"
+            print(f"🌐 Redirecting to web frontend: {redirect_url}")
+        elif platform in ['android', 'ios', 'react-native']:
+            # For React Native, redirect directly to the mobile app deep link
+            redirect_url = f"googleapidemo://photos/selection?sessionId={state}&success=true"
+            print(f"📱 Redirecting to mobile app: {redirect_url}")
+        else:
+            # Fallback to web
+            redirect_url = f"{FRONTEND_URL}?sessionId={state}&success=true"
+            print(f"🌐 Redirecting to web frontend (fallback): {redirect_url}")
         
         return redirect(redirect_url)
         
@@ -3175,6 +3414,103 @@ def get_photo_picker_url():
     except Exception as e:
         print(f"Photo Picker URL error: {e}")
         return jsonify({'error': 'Failed to get Photo Picker URL', 'details': str(e)}), 500
+
+@app.route('/mobile-redirect', methods=['GET'])
+def mobile_redirect():
+    """Mobile redirect page that redirects to the mobile app"""
+    try:
+        session_id = request.args.get('sessionId')
+        success = request.args.get('success')
+        platform = request.args.get('platform', 'react-native')
+        
+        # Create a mobile-friendly HTML page that redirects to the mobile app
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Redirecting to App</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    text-align: center;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                    margin: 0;
+                }}
+                .container {{
+                    max-width: 400px;
+                    margin: 50px auto;
+                    background: white;
+                    padding: 30px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }}
+                .spinner {{
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #3498db;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    animation: spin 2s linear infinite;
+                    margin: 20px auto;
+                }}
+                @keyframes spin {{
+                    0% {{ transform: rotate(0deg); }}
+                    100% {{ transform: rotate(360deg); }}
+                }}
+                .button {{
+                    background-color: #3498db;
+                    color: white;
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    margin: 10px;
+                }}
+                .button:hover {{
+                    background-color: #2980b9;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h2>🎉 Authentication Successful!</h2>
+                <div class="spinner"></div>
+                <p>Redirecting to your app...</p>
+                <p><strong>Session ID:</strong> {session_id}</p>
+                <button class="button" onclick="redirectToApp()">Open App</button>
+                <p><small>If the app doesn't open automatically, tap the button above</small></p>
+            </div>
+            
+            <script>
+                function redirectToApp() {{
+                    window.location.href = "googleapidemo://photos/selection?sessionId={session_id}&success={success}";
+                }}
+                
+                // Auto-redirect after 1 second
+                setTimeout(redirectToApp, 1000);
+                
+                // Show manual redirect option after 3 seconds
+                setTimeout(function() {{
+                    document.querySelector('.container').innerHTML = 
+                        '<h2>🎉 Authentication Successful!</h2>' +
+                        '<p><strong>Session ID:</strong> {session_id}</p>' +
+                        '<button class="button" onclick="redirectToApp()">Open App</button>' +
+                        '<p><small>Tap the button above to return to your app</small></p>';
+                }}, 3000);
+            </script>
+        </body>
+        </html>
+        """
+        
+        return html_content, 200, {'Content-Type': 'text/html'}
+        
+    except Exception as e:
+        print(f"Mobile redirect error: {e}")
+        return f"<html><body><h1>Error</h1><p>Failed to redirect: {str(e)}</p></body></html>", 500
 
 @app.route('/api/oauth/refresh', methods=['POST'])
 def refresh_token():
