@@ -2842,7 +2842,6 @@ def get_oauth_url():
             'https://www.googleapis.com/auth/userinfo.email',
             'https://www.googleapis.com/auth/drive.readonly',
             'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/photoslibrary.readonly',
             'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
         ]
         
@@ -2899,7 +2898,6 @@ def get_oauth_url_mobile():
             'https://www.googleapis.com/auth/userinfo.email',
             'https://www.googleapis.com/auth/drive.readonly',
             'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/photoslibrary.readonly',
             'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
         ]
         
@@ -2955,7 +2953,6 @@ def get_mobile_oauth_url():
             'https://www.googleapis.com/auth/userinfo.email',
             'https://www.googleapis.com/auth/drive.readonly',
             'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/photoslibrary.readonly',
             'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
         ]
         
@@ -3337,6 +3334,8 @@ def get_photo_picker_media():
         user_id = request.args.get('user_id')
         page_size = int(request.args.get('pageSize', 25))
         
+        print(f"📸 Photo Picker request - sessionId: {session_id}, user_id: {user_id}")
+        
         if not session_id:
             return jsonify({'error': 'Session ID is required'}), 400
         
@@ -3345,11 +3344,13 @@ def get_photo_picker_media():
         access_token = None
         if auth_header and auth_header.startswith('Bearer '):
             access_token = auth_header.split(' ')[1]
+            print(f"🔑 Using access token from Authorization header: {access_token[:20]}...")
         elif user_id:
             user_token = user_tokens.get(user_id)
             if not user_token or datetime.now().timestamp() > user_token['expires_at']:
                 return jsonify({'error': 'Token expired or invalid'}), 401
             access_token = user_token['access_token']
+            print(f"🔑 Using access token from user_tokens: {access_token[:20]}...")
         else:
             return jsonify({'error': 'Missing authorization'}), 401
         
@@ -3358,11 +3359,16 @@ def get_photo_picker_media():
             'pageSize': page_size
         }
         
+        print(f"🌐 Making request to Google Photo Picker API with params: {params}")
+        
         response = requests.get(
             'https://photospicker.googleapis.com/v1/mediaItems',
             params=params,
             headers={'Authorization': f'Bearer {access_token}'}
         )
+        
+        print(f"📡 Google API response status: {response.status_code}")
+        print(f"📡 Google API response: {response.text[:200]}...")
         
         if response.status_code != 200:
             return jsonify({'error': 'Failed to fetch selected photos', 'details': response.text}), 500
