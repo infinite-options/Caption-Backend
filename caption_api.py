@@ -12,9 +12,9 @@ import uuid
 import boto3
 import json
 import math
-import base64
 import hashlib
-import secrets
+import base64
+from urllib.parse import urlencode
 
 from datetime import time, date, datetime, timedelta
 import calendar
@@ -23,15 +23,14 @@ from pytz import timezone
 import random
 import string
 import stripe
-from typing import Dict
 
-from flask import Flask, request, render_template, Response, g, jsonify, redirect
+import requests as req_lib
+
+from flask import Flask, request, render_template, Response, g, jsonify
 from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_mail import Mail, Message
-
 from prometheus_client import Counter, Summary, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
-import logging
 
 # from cnn_webscrape import lambda_handler
 # used for serializer email and error handling
@@ -111,20 +110,17 @@ stripe.api_key = stripe_secret_test_key
 # stripe.api_key = ""sk_test_51J0UzOLGBFAvIBPFAm7Y5XGQ5APR...WTenXV4Q9ANpztS7Y7ghtwb007quqRPZ3""
 
 
-# CORS configuration for cross-origin requests
-CORS(app, 
-     origins=[
-         "http://localhost:3000",  # React frontend
-         "http://localhost:8081",  # Expo web
-         "http://127.0.0.1:3000",  # Alternative localhost
-         "http://127.0.0.1:4030",  # Backend itself
-         "https://capshnz.com",    # Production frontend
-         "exp://localhost:19000",  # Expo development
-         "exp://192.168.1.100:19000"  # Expo on local network
-     ],
-     supports_credentials=True,
-     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+CORS(app)
+
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:3000", "https://capshnz.com"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "expose_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
 
 # --------------- Mail Variables ------------------
 #This should be on Github -- should work wth environmental variables
@@ -160,30 +156,6 @@ app.config["STRIPE_SECRET_KEY"] = os.getenv("STRIPE_SECRET_KEY")
 
 mail = Mail(app)
 
-# Google API Configuration
-GOOGLE_CLIENT_ID = os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB')
-GOOGLE_CLIENT_SECRET = os.getenv('REACT_APP_GOOGLE_CLIENT_SECRET_WEB')
-REDIRECT_URI = os.getenv('REDIRECT_URI', 'http://localhost:3000')
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
-
-# Store active sessions (in production, use Redis)
-active_sessions: Dict[str, Dict] = {}
-user_tokens: Dict[str, Dict] = {}
-
-# Utility functions for Google OAuth
-def base64url_encode(data: bytes) -> str:
-    """Base64 URL encode without padding"""
-    return base64.urlsafe_b64encode(data).decode('utf-8').rstrip('=')
-
-def generate_code_verifier() -> str:
-    """Generate a cryptographically random code verifier"""
-    return base64url_encode(secrets.token_bytes(32))
-
-def generate_code_challenge(verifier: str) -> str:
-    """Generate code challenge from verifier using SHA256"""
-    digest = hashlib.sha256(verifier.encode('utf-8')).digest()
-    return base64url_encode(digest)
-
 # API
 api = Api(app)
 
@@ -200,17 +172,8 @@ app_env = os.getenv("app_env")
 # print(app_env)
 
 if app_env == "production":
-    logging.getLogger('werkzeug').setLevel(logging.ERROR)
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-    logger = logging.getLogger(__name__)
-else:
-    # For non-production environments, use a simple print logger
-    class PrintLogger:
-        def info(self, msg): print(f"INFO: {msg}")
-        def error(self, msg): print(f"ERROR: {msg}")
-        def warning(self, msg): print(f"WARNING: {msg}")
-        def debug(self, msg): print(f"DEBUG: {msg}")
-    logger = PrintLogger()
+    # Logging disabled - using print statements instead
+    pass
 
 registry = CollectorRegistry()
 
@@ -2389,8 +2352,7 @@ class CheckEmailValidationCode(Resource):
         finally:
             disconnect(conn)
 
-        # ENDPOINT AND JSON OBJECT THAT WORKS
-        # http://localhost:4000/api/v2/createappointmen
+        
 
 
 
@@ -2649,15 +2611,6 @@ def before_request():
     g.start_time = time.time()
     # client_ip = request.remote_addr
     # print(f"Incoming request from IP: {client_ip} to {request.path} with method {request.method}")
-    
-    # Handle CORS preflight requests
-    if request.method == 'OPTIONS':
-        response = jsonify({'status': 'OK'})
-        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', '*'))
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
 
 @app.after_request
 def after_request(response):
@@ -2687,12 +2640,8 @@ def after_request(response):
     current_timestamp = get_pst_timestamp()
 
     # Log details
-    logger.info(
-        f"IP: {client_ip}, Endpoint: {endpoint}, Method: {method}, "
-        f"Status Code: {status_code}, Timestamp: {current_timestamp}, Latency: {latency:.3f}s, "
-        f"Request Size: {request_size} bytes, Response Size: {response_size} bytes, "
-        f"User-Agent: {user_agent}, Query: {query_params}, Payload: {payload}"
-    )
+    print(f"API Call - IP: {client_ip}, Endpoint: {endpoint}, Method: {method}, Status: {status_code}, Latency: {latency:.3f}s")
+    print(f"User-Agent: {user_agent}, Query: {query_params}, Payload: {payload}")
 
     if endpoint != "/metrics" and endpoint != "/favicon.ico":
         endpoint_parts = endpoint.split('/')
@@ -2739,976 +2688,13 @@ def after_request(response):
 @app.errorhandler(Exception)
 def handle_exception(e):
     client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-    logger.error(f"Unhandled Exception: {str(e)}, IP: {client_ip}, Endpoint: {request.path}")
+    print(f"Unhandled Exception: {str(e)}, IP: {client_ip}, Endpoint: {request.path}")
     return jsonify({"error": "Internal server error"}), 500
 
 class Metrics(Resource):
     def get(self):
         return Response(generate_latest(registry), mimetype=CONTENT_TYPE_LATEST)
     
-# -- GOOGLE API ENDPOINTS (from app.py) --------------------------------------------------------
-
-@app.route('/', methods=['GET'])
-def root():
-    """Root endpoint"""
-    return jsonify({
-        'message': 'Caption Backend API',
-        'version': '1.0.0',
-        'status': 'running',
-        'endpoints': {
-            'health': '/api/health',
-            'oauth': '/api/oauth/url',
-            'oauth_mobile': '/api/oauth/url/mobile',
-            'oauth_mobile_direct': '/api/oauth/mobile-url',
-            'oauth_mobile_token': '/api/oauth/mobile-token',
-            'user_profile': '/api/user/profile',
-            'photo_picker': '/api/photos/picker/session',
-            'drive_files': '/api/drive/files',
-            'calendar_events': '/api/calendar/events',
-            'drive_photos': '/api/drive/photos'
-        }
-    })
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'OK',
-        'message': 'Google API Demo Backend is running',
-        'timestamp': datetime.now().isoformat(),
-        'version': '1.0.0'
-    })
-
-@app.route('/api/oauth/url', methods=['GET'])
-def get_oauth_url():
-    """Get OAuth URL for mobile"""
-    try:
-        code_verifier = generate_code_verifier()
-        code_challenge = generate_code_challenge(code_verifier)
-        
-        # Store code verifier for later use
-        session_id = str(uuid.uuid4())
-        user_agent = request.headers.get('User-Agent', 'unknown')
-        
-        # Check platform and determine appropriate redirect URI
-        platform = request.args.get('platform', '').lower()
-        client = request.args.get('client', '').lower()
-        
-        # Detect platform from User-Agent if not specified
-        if not platform and not client:
-            if 'ReactNative' in user_agent or 'Expo' in user_agent:
-                # Try to detect specific platform from User-Agent
-                if 'Android' in user_agent:
-                    platform = 'android'
-                elif 'iPhone' in user_agent or 'iPad' in user_agent:
-                    platform = 'ios'
-                else:
-                    platform = 'react-native'  # Generic React Native
-        
-        # Store session with platform info
-        active_sessions[session_id] = {
-            'code_verifier': code_verifier,
-            'timestamp': datetime.now().timestamp(),
-            'user_agent': user_agent,
-            'platform': platform  # Store platform for later use in callback
-        }
-        
-        # Determine redirect URI based on client type
-        redirect_uri = REDIRECT_URI  # Default to web redirect
-        
-        # Determine redirect URI based on platform
-        if platform == 'web':
-            # Web platform - use web redirect URI
-            redirect_uri = REDIRECT_URI
-            print(f"🌐 Using web redirect URI: {redirect_uri}")
-        elif platform == 'android':
-            # Android React Native - use AWS API Gateway URL
-            redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
-            print(f"🤖 Using Android redirect URI: {redirect_uri}")
-        elif platform == 'ios':
-            # iOS React Native - use AWS API Gateway URL
-            redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
-            print(f"📱 Using iOS redirect URI: {redirect_uri}")
-        elif platform in ['react-native'] or client == 'react-native':
-            # Generic React Native - use AWS API Gateway URL
-            redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
-            print(f"📱 Using React Native redirect URI: {redirect_uri}")
-        else:
-            # Default to web for unknown platforms
-            print(f"🌐 Using default web redirect URI: {redirect_uri}")
-        
-        scopes = [
-            'https://www.googleapis.com/auth/userinfo.profile',
-            'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/drive.readonly',
-            'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
-        ]
-        
-        auth_url = (
-            f"https://accounts.google.com/o/oauth2/v2/auth?"
-            f"response_type=code&"
-            f"client_id={GOOGLE_CLIENT_ID}&"
-            f"redirect_uri={redirect_uri}&"
-            f"scope={' '.join(scopes)}&"
-            f"code_challenge={code_challenge}&"
-            f"code_challenge_method=S256&"
-            f"include_granted_scopes=true&"
-            f"access_type=offline&"
-            f"prompt=consent&"
-            f"state={session_id}"
-        )
-        
-        return jsonify({
-            'authUrl': auth_url,
-            'sessionId': session_id,
-            'redirectUri': redirect_uri,
-            'platform': platform,
-            'message': 'Use this URL for OAuth flow',
-            'expiresIn': 600  # 10 minutes
-        })
-        
-    except Exception as e:
-        print(f"Error generating OAuth URL: {e}")
-        return jsonify({'error': 'Failed to generate OAuth URL'}), 500
-
-@app.route('/api/oauth/url/mobile', methods=['GET'])
-def get_oauth_url_mobile():
-    """Get OAuth URL specifically for React Native mobile"""
-    try:
-        code_verifier = generate_code_verifier()
-        code_challenge = generate_code_challenge(code_verifier)
-        
-        # Store code verifier for later use
-        session_id = str(uuid.uuid4())
-        user_agent = request.headers.get('User-Agent', 'unknown')
-        
-        active_sessions[session_id] = {
-            'code_verifier': code_verifier,
-            'timestamp': datetime.now().timestamp(),
-            'user_agent': user_agent
-        }
-        
-        # Always use React Native redirect URI for this endpoint
-        redirect_uri = "googleapidemo://photos/selection"
-        print(f"📱 Using React Native redirect URI: {redirect_uri}")
-        
-        scopes = [
-            'https://www.googleapis.com/auth/userinfo.profile',
-            'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/drive.readonly',
-            'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
-        ]
-        
-        auth_url = (
-            f"https://accounts.google.com/o/oauth2/v2/auth?"
-            f"response_type=code&"
-            f"client_id={GOOGLE_CLIENT_ID}&"
-            f"redirect_uri={redirect_uri}&"
-            f"scope={' '.join(scopes)}&"
-            f"code_challenge={code_challenge}&"
-            f"code_challenge_method=S256&"
-            f"include_granted_scopes=true&"
-            f"access_type=offline&"
-            f"prompt=consent&"
-            f"state={session_id}"
-        )
-        
-        return jsonify({
-            'authUrl': auth_url,
-            'sessionId': session_id,
-            'redirectUri': redirect_uri,
-            'platform': 'react-native',
-            'message': 'Use this URL for React Native OAuth flow',
-            'expiresIn': 600  # 10 minutes
-        })
-        
-    except Exception as e:
-        print(f"Error generating mobile OAuth URL: {e}")
-        return jsonify({'error': 'Failed to generate mobile OAuth URL'}), 500
-
-@app.route('/api/oauth/mobile-url', methods=['GET'])
-def get_mobile_oauth_url():
-    """Get OAuth URL for React Native mobile apps (direct authentication)"""
-    try:
-        # Generate PKCE parameters
-        code_verifier = generate_code_verifier()
-        code_challenge = generate_code_challenge(code_verifier)
-        
-        # Generate session ID
-        session_id = str(uuid.uuid4())
-        
-        # Store session for later token exchange
-        active_sessions[session_id] = {
-            'code_verifier': code_verifier,
-            'timestamp': datetime.now().timestamp(),
-            'user_agent': request.headers.get('User-Agent', 'unknown'),
-            'platform': 'mobile'
-        }
-        
-        # Scopes for mobile
-        scopes = [
-            'https://www.googleapis.com/auth/userinfo.profile',
-            'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/drive.readonly',
-            'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
-        ]
-        
-        # Use AWS API Gateway redirect URI (works for all platforms)
-        redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
-        
-        # Build OAuth URL
-        auth_url = (
-            f"https://accounts.google.com/o/oauth2/v2/auth?"
-            f"response_type=code&"
-            f"client_id={GOOGLE_CLIENT_ID}&"
-            f"redirect_uri={redirect_uri}&"
-            f"scope={' '.join(scopes)}&"
-            f"code_challenge={code_challenge}&"
-            f"code_challenge_method=S256&"
-            f"include_granted_scopes=true&"
-            f"access_type=offline&"
-            f"prompt=consent&"
-            f"state={session_id}"
-        )
-        
-        return jsonify({
-            'authUrl': auth_url,
-            'sessionId': session_id,
-            'redirectUri': redirect_uri,
-            'codeVerifier': code_verifier,  # Frontend needs this for token exchange
-            'platform': 'mobile',
-            'message': 'Use this URL for direct mobile OAuth flow',
-            'expiresIn': 600
-        })
-        
-    except Exception as e:
-        print(f"Error generating mobile OAuth URL: {e}")
-        return jsonify({'error': 'Failed to generate mobile OAuth URL'}), 500
-
-@app.route('/api/oauth/mobile-token', methods=['POST'])
-def exchange_mobile_token():
-    """Exchange code for token (mobile direct authentication)"""
-    try:
-        data = request.get_json() or {}
-        code = data.get('code')
-        session_id = data.get('sessionId')
-        code_verifier = data.get('codeVerifier')
-        
-        if not code or not session_id or not code_verifier:
-            return jsonify({'error': 'Missing required parameters'}), 400
-        
-        # Verify session exists
-        session = active_sessions.get(session_id)
-        if not session:
-            return jsonify({'error': 'Invalid or expired session'}), 400
-        
-        # Exchange code for token using PKCE
-        token_data = {
-            'client_id': GOOGLE_CLIENT_ID,
-            'code': code,
-            'grant_type': 'authorization_code',
-            'redirect_uri': 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback',
-            'code_verifier': code_verifier
-        }
-        
-        response = requests.post(
-            'https://oauth2.googleapis.com/token',
-            data=token_data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
-        )
-        
-        if response.status_code != 200:
-            return jsonify({'error': 'Token exchange failed', 'details': response.text}), 500
-        
-        tokens = response.json()
-        
-        # Store tokens in session
-        active_sessions[session_id]['tokens'] = tokens
-        
-        return jsonify({
-            'success': True,
-            'sessionId': session_id,
-            'tokens': {
-                'access_token': tokens['access_token'],
-                'refresh_token': tokens.get('refresh_token'),
-                'expires_in': tokens['expires_in'],
-                'scope': tokens.get('scope'),
-                'token_type': tokens.get('token_type')
-            }
-        })
-        
-    except Exception as e:
-        print(f"Mobile token exchange error: {e}")
-        return jsonify({'error': 'Token exchange failed', 'details': str(e)}), 500
-
-@app.route('/api/oauth/token', methods=['POST'])
-def exchange_code_for_token():
-    """Exchange code for token"""
-    try:
-        # Handle empty or invalid JSON gracefully
-        try:
-            data = request.get_json() or {}
-        except Exception:
-            data = {}
-        code = data.get('code')
-        state = data.get('state')
-        user_id = data.get('userId')
-        
-        if not code or not state:
-            return jsonify({'error': 'Missing code or state parameter'}), 400
-        
-        # Retrieve code verifier from session
-        session = active_sessions.get(state)
-        if not session:
-            return jsonify({'error': 'Invalid or expired session'}), 400
-        
-        # Check if session is expired (10 minutes)
-        if datetime.now().timestamp() - session['timestamp'] > 600:
-            active_sessions.pop(state, None)
-            return jsonify({'error': 'Session expired'}), 400
-        
-        code_verifier = session['code_verifier']
-        
-        # Exchange code for token
-        token_data = {
-            'client_id': GOOGLE_CLIENT_ID,
-            'client_secret': GOOGLE_CLIENT_SECRET,
-            'code': code,
-            'grant_type': 'authorization_code',
-            'redirect_uri': REDIRECT_URI,
-            'code_verifier': code_verifier
-        }
-        
-        response = requests.post(
-            'https://oauth2.googleapis.com/token',
-            data=token_data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
-        )
-        
-        if response.status_code != 200:
-            return jsonify({'error': 'Token exchange failed'}), 500
-        
-        token_response = response.json()
-        
-        # Clean up session
-        active_sessions.pop(state, None)
-        
-        # Store user token
-        user_token_id = user_id or str(uuid.uuid4())
-        user_tokens[user_token_id] = {
-            'access_token': token_response['access_token'],
-            'refresh_token': token_response.get('refresh_token'),
-            'expires_at': datetime.now().timestamp() + token_response['expires_in'],
-            'user_id': user_token_id
-        }
-        
-        return jsonify({
-            'access_token': token_response['access_token'],
-            'refresh_token': token_response.get('refresh_token'),
-            'expires_in': token_response['expires_in'],
-            'scope': token_response.get('scope'),
-            'user_id': user_token_id
-        })
-        
-    except Exception as e:
-        print(f"Token exchange error: {e}")
-        return jsonify({'error': 'Token exchange failed', 'details': str(e)}), 500
-
-@app.route('/api/oauth/callback', methods=['GET'])
-def oauth_callback():
-    """OAuth callback endpoint"""
-    print("🔄 OAUTH CALLBACK ENDPOINT HIT!")
-    print(f"🔄 Request from: {request.remote_addr}")
-    
-    try:
-        code = request.args.get('code')
-        state = request.args.get('state')
-        
-        print(f"🔄 Query params - code: {code}, state: {state}")
-        
-        if not code or not state:
-            print("❌ Missing code or state in query parameters")
-            return jsonify({'error': 'Missing code or state'}), 400
-        
-        # Get stored code verifier for PKCE
-        session = active_sessions.get(state)
-        if not session:
-            print(f"❌ Session not found for state: {state}")
-            return jsonify({'error': 'Invalid or expired session'}), 400
-        
-        code_verifier = session['code_verifier']
-        if not code_verifier:
-            print(f"❌ Code verifier not found for session: {state}")
-            return jsonify({'error': 'Missing code verifier'}), 400
-        
-        # Exchange code for tokens with Google (using PKCE)
-        token_data = {
-            'code': code,
-            'client_id': GOOGLE_CLIENT_ID,
-            'client_secret': GOOGLE_CLIENT_SECRET,
-            'redirect_uri': REDIRECT_URI,
-            'grant_type': 'authorization_code',
-            'code_verifier': code_verifier
-        }
-        
-        print("🌐 Making request to Google OAuth token endpoint")
-        
-        response = requests.post(
-            'https://oauth2.googleapis.com/token',
-            data=token_data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
-        )
-        
-        if response.status_code != 200:
-            print(f"❌ Google token exchange failed: {response.text}")
-            return jsonify({'error': 'Token exchange failed'}), 500
-        
-        tokens = response.json()
-        print("✅ Successfully exchanged code for tokens")
-        
-        # Store tokens with state for later retrieval
-        if state:
-            active_sessions[state] = {
-                'tokens': tokens,
-                'timestamp': datetime.now().timestamp(),
-                'code_verifier': code_verifier
-            }
-            print(f"💾 Tokens stored for state: {state}")
-        else:
-            print("❌ No state provided, cannot store tokens")
-        
-        # Determine redirect URL based on the original request
-        session = active_sessions.get(state, {})
-        user_agent = session.get('user_agent', '')
-        
-        # Get the platform from the stored session (if available)
-        # We can store platform info in the session when creating the OAuth URL
-        platform = session.get('platform', 'web')
-        
-        if platform == 'web':
-            # For web, redirect to frontend URL
-            redirect_url = f"{FRONTEND_URL}?sessionId={state}&success=true"
-            print(f"🌐 Redirecting to web frontend: {redirect_url}")
-        elif platform in ['android', 'ios', 'react-native']:
-            # For React Native, redirect directly to the mobile app deep link
-            redirect_url = f"googleapidemo://photos/selection?sessionId={state}&success=true"
-            print(f"📱 Redirecting to mobile app: {redirect_url}")
-        else:
-            # Fallback to web
-            redirect_url = f"{FRONTEND_URL}?sessionId={state}&success=true"
-            print(f"🌐 Redirecting to web frontend (fallback): {redirect_url}")
-        
-        return redirect(redirect_url)
-        
-    except Exception as e:
-        print(f"❌ Error in OAuth callback: {e}")
-        return jsonify({'error': 'OAuth callback failed', 'details': str(e)}), 500
-
-@app.route('/api/oauth/token/<session_id>', methods=['GET'])
-def get_tokens_by_session_id(session_id):
-    """Get tokens by session ID"""
-    try:
-        print(f"🔍 Retrieving tokens for session ID: {session_id}")
-        
-        if not session_id:
-            return jsonify({'error': 'Session ID is required'}), 400
-        
-        # Get session from active_sessions
-        session = active_sessions.get(session_id)
-        if not session:
-            print(f"❌ Session not found for ID: {session_id}")
-            return jsonify({'error': 'Session not found or expired'}), 404
-        
-        # Check if session is expired (10 minutes)
-        if datetime.now().timestamp() - session['timestamp'] > 600:
-            print(f"❌ Session expired for ID: {session_id}")
-            active_sessions.pop(session_id, None)
-            return jsonify({'error': 'Session expired'}), 410
-        
-        # Check if tokens exist
-        if 'tokens' not in session:
-            print(f"❌ No tokens found for session ID: {session_id}")
-            return jsonify({'error': 'No tokens found for this session'}), 404
-        
-        print(f"✅ Tokens retrieved for session ID: {session_id}")
-        
-        # Return the tokens (excluding sensitive data like codeVerifier)
-        response = {
-            'access_token': session['tokens']['access_token'],
-            'expires_in': session['tokens']['expires_in'],
-            'refresh_token': session['tokens'].get('refresh_token'),
-            'scope': session['tokens'].get('scope'),
-            'token_type': session['tokens'].get('token_type')
-        }
-        
-        # Optionally include id_token if present
-        if 'id_token' in session['tokens']:
-            response['id_token'] = session['tokens']['id_token']
-        
-        return jsonify(response)
-        
-    except Exception as e:
-        print(f"❌ Error retrieving tokens for session {session_id}: {e}")
-        return jsonify({'error': 'Failed to retrieve tokens', 'details': str(e)}), 500
-
-@app.route('/api/user/profile', methods=['GET'])
-def get_user_profile():
-    """Get user profile"""
-    try:
-        user_id = request.args.get('user_id')
-        auth_header = request.headers.get('Authorization')
-        
-        access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
-        elif user_id:
-            user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
-        else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
-        response = requests.get(
-            'https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses,photos',
-            headers={'Authorization': f'Bearer {access_token}'}
-        )
-        
-        if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch profile', 'details': response.text}), 500
-        
-        return jsonify(response.json())
-        
-    except Exception as e:
-        print(f"Profile fetch error: {e}")
-        return jsonify({'error': 'Failed to fetch profile', 'details': str(e)}), 500
-
-@app.route('/api/photos/picker/session', methods=['POST'])
-def create_photo_picker_session():
-    """Create Photo Picker session"""
-    try:
-        # Handle empty or invalid JSON gracefully
-        try:
-            data = request.get_json() or {}
-        except Exception:
-            data = {}
-        user_id = data.get('user_id')
-        auth_header = request.headers.get('Authorization')
-        
-        access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
-        elif user_id:
-            user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
-        else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
-        response = requests.post(
-            'https://photospicker.googleapis.com/v1/sessions',
-            headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {access_token}'
-            }
-        )
-        
-        if response.status_code != 200:
-            return jsonify({'error': 'Failed to create Photo Picker session', 'details': response.text}), 500
-        
-        return jsonify(response.json())
-        
-    except Exception as e:
-        print(f"Photo Picker session creation error: {e}")
-        return jsonify({'error': 'Failed to create Photo Picker session', 'details': str(e)}), 500
-
-@app.route('/api/photos/picker/media', methods=['GET'])
-def get_photo_picker_media():
-    """Get selected photos from Photo Picker"""
-    try:
-        session_id = request.args.get('sessionId')
-        user_id = request.args.get('user_id')
-        page_size = int(request.args.get('pageSize', 25))
-        
-        print(f"📸 Photo Picker request - sessionId: {session_id}, user_id: {user_id}")
-        
-        if not session_id:
-            return jsonify({'error': 'Session ID is required'}), 400
-        
-        auth_header = request.headers.get('Authorization')
-        
-        access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
-            print(f"🔑 Using access token from Authorization header: {access_token[:20]}...")
-        elif user_id:
-            user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
-            print(f"🔑 Using access token from user_tokens: {access_token[:20]}...")
-        else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
-        params = {
-            'sessionId': session_id,
-            'pageSize': page_size
-        }
-        
-        print(f"🌐 Making request to Google Photo Picker API with params: {params}")
-        
-        response = requests.get(
-            'https://photospicker.googleapis.com/v1/mediaItems',
-            params=params,
-            headers={'Authorization': f'Bearer {access_token}'}
-        )
-        
-        print(f"📡 Google API response status: {response.status_code}")
-        print(f"📡 Google API response: {response.text[:200]}...")
-        
-        if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch selected photos', 'details': response.text}), 500
-        
-        return jsonify(response.json())
-        
-    except Exception as e:
-        print(f"Photo Picker media fetch error: {e}")
-        return jsonify({'error': 'Failed to fetch selected photos', 'details': str(e)}), 500
-
-@app.route('/api/photos/picker/url', methods=['GET'])
-def get_photo_picker_url():
-    """Get Photo Picker URL for WebView"""
-    try:
-        user_id = request.args.get('user_id')
-        auth_header = request.headers.get('Authorization')
-        
-        access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
-        elif user_id:
-            user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
-        else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
-        # Create Photo Picker session
-        session_response = requests.post(
-            'https://photospicker.googleapis.com/v1/sessions',
-            headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {access_token}'
-            }
-        )
-        
-        if session_response.status_code != 200:
-            return jsonify({'error': 'Failed to get Photo Picker URL', 'details': session_response.text}), 500
-        
-        session_data = session_response.json()
-        
-        return jsonify({
-            'pickerUrl': session_data['pickerUri'],
-            'sessionId': session_data['id'],
-            'message': 'Use this URL in WebView for Photo Picker'
-        })
-        
-    except Exception as e:
-        print(f"Photo Picker URL error: {e}")
-        return jsonify({'error': 'Failed to get Photo Picker URL', 'details': str(e)}), 500
-
-@app.route('/mobile-redirect', methods=['GET'])
-def mobile_redirect():
-    """Mobile redirect page that redirects to the mobile app"""
-    try:
-        session_id = request.args.get('sessionId')
-        success = request.args.get('success')
-        platform = request.args.get('platform', 'react-native')
-        
-        # Create a mobile-friendly HTML page that redirects to the mobile app
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Redirecting to App</title>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    text-align: center;
-                    padding: 20px;
-                    background-color: #f5f5f5;
-                    margin: 0;
-                }}
-                .container {{
-                    max-width: 400px;
-                    margin: 50px auto;
-                    background: white;
-                    padding: 30px;
-                    border-radius: 10px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                }}
-                .spinner {{
-                    border: 4px solid #f3f3f3;
-                    border-top: 4px solid #3498db;
-                    border-radius: 50%;
-                    width: 40px;
-                    height: 40px;
-                    animation: spin 2s linear infinite;
-                    margin: 20px auto;
-                }}
-                @keyframes spin {{
-                    0% {{ transform: rotate(0deg); }}
-                    100% {{ transform: rotate(360deg); }}
-                }}
-                .button {{
-                    background-color: #3498db;
-                    color: white;
-                    padding: 10px 20px;
-                    border: none;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 16px;
-                    margin: 10px;
-                }}
-                .button:hover {{
-                    background-color: #2980b9;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h2>🎉 Authentication Successful!</h2>
-                <div class="spinner"></div>
-                <p>Redirecting to your app...</p>
-                <p><strong>Session ID:</strong> {session_id}</p>
-                <button class="button" onclick="redirectToApp()">Open App</button>
-                <p><small>If the app doesn't open automatically, tap the button above</small></p>
-            </div>
-            
-            <script>
-                function redirectToApp() {{
-                    window.location.href = "googleapidemo://photos/selection?sessionId={session_id}&success={success}";
-                }}
-                
-                // Auto-redirect after 1 second
-                setTimeout(redirectToApp, 1000);
-                
-                // Show manual redirect option after 3 seconds
-                setTimeout(function() {{
-                    document.querySelector('.container').innerHTML = 
-                        '<h2>🎉 Authentication Successful!</h2>' +
-                        '<p><strong>Session ID:</strong> {session_id}</p>' +
-                        '<button class="button" onclick="redirectToApp()">Open App</button>' +
-                        '<p><small>Tap the button above to return to your app</small></p>';
-                }}, 3000);
-            </script>
-        </body>
-        </html>
-        """
-        
-        return html_content, 200, {'Content-Type': 'text/html'}
-        
-    except Exception as e:
-        print(f"Mobile redirect error: {e}")
-        return f"<html><body><h1>Error</h1><p>Failed to redirect: {str(e)}</p></body></html>", 500
-
-@app.route('/api/oauth/refresh', methods=['POST'])
-def refresh_token():
-    """Refresh token endpoint"""
-    try:
-        # Handle empty or invalid JSON gracefully
-        try:
-            data = request.get_json() or {}
-        except Exception:
-            data = {}
-        refresh_token = data.get('refresh_token')
-        user_id = data.get('user_id')
-        
-        if not refresh_token:
-            return jsonify({'error': 'Refresh token is required'}), 400
-        
-        response = requests.post(
-            'https://oauth2.googleapis.com/token',
-            data={
-                'client_id': GOOGLE_CLIENT_ID,
-                'client_secret': GOOGLE_CLIENT_SECRET,
-                'refresh_token': refresh_token,
-                'grant_type': 'refresh_token'
-            },
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
-        )
-        
-        if response.status_code != 200:
-            return jsonify({'error': 'Token refresh failed', 'details': response.text}), 500
-        
-        token_data = response.json()
-        
-        # Update stored token
-        if user_id and user_id in user_tokens:
-            user_tokens[user_id]['access_token'] = token_data['access_token']
-            user_tokens[user_id]['expires_at'] = datetime.now().timestamp() + token_data['expires_in']
-        
-        return jsonify({
-            'access_token': token_data['access_token'],
-            'expires_in': token_data['expires_in']
-        })
-        
-    except Exception as e:
-        print(f"Token refresh error: {e}")
-        return jsonify({'error': 'Token refresh failed', 'details': str(e)}), 500
-
-@app.route('/api/drive/files', methods=['GET'])
-def get_drive_files():
-    """Get Drive files"""
-    try:
-        user_id = request.args.get('user_id')
-        page_size = int(request.args.get('pageSize', 20))
-        auth_header = request.headers.get('Authorization')
-        
-        access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
-        elif user_id:
-            user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
-        else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
-        params = {
-            'pageSize': page_size,
-            'fields': 'files(id,name,mimeType,createdTime,modifiedTime,size,webViewLink,thumbnailLink,imageMediaMetadata)',
-            'orderBy': 'modifiedTime desc'
-        }
-        
-        response = requests.get(
-            'https://www.googleapis.com/drive/v3/files',
-            params=params,
-            headers={'Authorization': f'Bearer {access_token}'}
-        )
-        
-        if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch Drive files', 'details': response.text}), 500
-        
-        return jsonify(response.json())
-        
-    except Exception as e:
-        print(f"Drive files fetch error: {e}")
-        return jsonify({'error': 'Failed to fetch Drive files', 'details': str(e)}), 500
-
-@app.route('/api/calendar/events', methods=['GET'])
-def get_calendar_events():
-    """Get Calendar events"""
-    try:
-        date = request.args.get('date')
-        user_id = request.args.get('user_id')
-        
-        if not date:
-            return jsonify({'error': 'Date parameter is required'}), 400
-        
-        auth_header = request.headers.get('Authorization')
-        
-        access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
-        elif user_id:
-            user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
-        else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
-        time_min = f"{date}T00:00:00Z"
-        time_max = f"{date}T23:59:59Z"
-        
-        params = {
-            'timeMin': time_min,
-            'timeMax': time_max,
-            'maxResults': 20,
-            'singleEvents': True,
-            'orderBy': 'startTime'
-        }
-        
-        response = requests.get(
-            'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-            params=params,
-            headers={'Authorization': f'Bearer {access_token}'}
-        )
-        
-        if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch Calendar events', 'details': response.text}), 500
-        
-        return jsonify(response.json())
-        
-    except Exception as e:
-        print(f"Calendar events fetch error: {e}")
-        return jsonify({'error': 'Failed to fetch Calendar events', 'details': str(e)}), 500
-
-@app.route('/api/drive/photos', methods=['GET'])
-def get_drive_photos():
-    """Get Drive photos"""
-    try:
-        user_id = request.args.get('user_id')
-        page_size = int(request.args.get('pageSize', 20))
-        auth_header = request.headers.get('Authorization')
-        
-        access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
-        elif user_id:
-            user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
-        else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
-        params = {
-            'q': "mimeType contains 'image/'",
-            'pageSize': page_size,
-            'fields': 'files(id,name,mimeType,createdTime,modifiedTime,size,webViewLink,thumbnailLink,imageMediaMetadata,webContentLink)',
-            'orderBy': 'modifiedTime desc'
-        }
-        
-        response = requests.get(
-            'https://www.googleapis.com/drive/v3/files',
-            params=params,
-            headers={'Authorization': f'Bearer {access_token}'}
-        )
-        
-        if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch Drive photos', 'details': response.text}), 500
-        
-        # Transform the data for mobile
-        files = response.json().get('files', [])
-        photos = [
-            {
-                'id': file['id'],
-                'name': file['name'],
-                'url': file['webViewLink'],
-                'thumbnails': [{'url': file['thumbnailLink']}] if file.get('thumbnailLink') else [],
-                'mimeType': file['mimeType'],
-                'size': file.get('size'),
-                'modifiedTime': file['modifiedTime'],
-                'imageMetadata': file.get('imageMediaMetadata')
-            }
-            for file in files
-        ]
-        
-        return jsonify({'photos': photos, 'totalCount': len(photos)})
-        
-    except Exception as e:
-        print(f"Drive photos fetch error: {e}")
-        return jsonify({'error': 'Failed to fetch Drive photos', 'details': str(e)}), 500
-
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
 
@@ -3768,5 +2754,1015 @@ api.add_resource(Metrics, "/metrics")
 api.add_resource(CNNWebScrape , "/api/v2/cnn_webscrape")
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
+# Add root endpoint
+@app.route('/', methods=['GET'])
+def root():
+    """Root endpoint - redirect to health or show API info"""
+    return {
+        'message': 'Caption API is running',
+        'status': 'OK',
+        'timestamp': datetime.now().isoformat(),
+        'endpoints': {
+            'health': '/health',
+            'test': '/test',
+            'oauth_url': '/api/oauth/url',
+            'api_docs': 'All /api/v2/* endpoints available'
+        }
+    }
+
+# Add health endpoint directly
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    import time as time_module
+    return {
+        'status': 'OK',
+        'timestamp': datetime.now().isoformat(),
+        'uptime': time_module.time(),
+        'message': 'Caption API is running'
+    }
+
+# Add test endpoint directly
+@app.route('/test', methods=['GET'])
+def test_endpoint():
+    """Test endpoint for debugging"""
+    print("🧪 TEST ENDPOINT HIT!")
+    print(f"🧪 Request from: {request.remote_addr}")
+    print(f"🧪 User-Agent: {request.headers.get('User-Agent')}")
+    return {
+        'message': 'Caption API is accessible!',
+        'timestamp': datetime.now().isoformat(),
+        'ip': request.remote_addr
+    }
+
+@app.route('/api/oauth/token-test', methods=['GET'])
+def test_token_endpoint():
+    """Test endpoint to verify token response format"""
+    print("🧪 TEST TOKEN ENDPOINT HIT!")
+    
+    # Create a mock response similar to what the real endpoint returns
+    mock_tokens = {
+        'access_token': 'ya29.test_access_token_12345',
+        'refresh_token': '1//test_refresh_token_67890',
+        'scope': 'https://www.googleapis.com/auth/photospicker.mediaitems.readonly',
+        'token_type': 'Bearer',
+        'expires_in': 3599
+    }
+    
+    response_data = {
+        'success': True,
+        'sessionId': 'test-session-123',
+        'tokens': mock_tokens
+    }
+    
+    print(f"🧪 Test response: {json.dumps(response_data, indent=2)}")
+    return response_data
+
+# Helper function for environment detection
+def get_redirect_uri():
+    """Determine the correct redirect URI based on the current environment"""
+    is_local = (
+        request.host and (
+            'localhost' in request.host or 
+            '127.0.0.1' in request.host or
+            request.host.startswith('10.0.2.2') or  # Android emulator
+            request.host.startswith('192.168.') or  # Local network
+            request.host.startswith('172.')  # Docker/VM
+        )
+    )
+    
+    if is_local:
+        return os.getenv('REDIRECT_URI_LOCAL', 'http://localhost:4030/api/oauth/callback'), is_local
+    else:
+        return os.getenv('REDIRECT_URI', 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback'), is_local
+
+# Photo-picker Resource classes
+class OAuthURL(Resource):
+    def get(self):
+        """Get OAuth URL for Google authentication"""
+        print("🔐 OAUTH URL ENDPOINT HIT!")
+        print(f"🔐 Request from: {request.remote_addr}")
+        print(f"🔐 User-Agent: {request.headers.get('User-Agent')}")
+        try:
+            def base64url_encode(buffer):
+                return base64.b64encode(buffer).decode('utf-8').replace('+', '-').replace('/', '_').replace('=', '')
+            
+            def generate_code_verifier():
+                return base64url_encode(os.urandom(32))
+            
+            def generate_code_challenge(verifier):
+                return base64url_encode(hashlib.sha256(verifier.encode('utf-8')).digest())
+            
+            def build_auth_url(code_challenge, session_id):
+                # Determine redirect URI based on environment
+                redirect_uri, is_local = get_redirect_uri()
+                
+                params = {
+                    'response_type': 'code',
+                    'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
+                    'redirect_uri': redirect_uri,
+                    'scope': ' '.join([
+                        'https://www.googleapis.com/auth/userinfo.profile',
+                        'https://www.googleapis.com/auth/userinfo.email',
+                        'https://www.googleapis.com/auth/photoslibrary.readonly',
+                        'https://www.googleapis.com/auth/photospicker.mediaitems.readonly',
+                        'openid'
+                    ]),
+                    'code_challenge': code_challenge,
+                    'code_challenge_method': 'S256',
+                    'include_granted_scopes': 'true',
+                    'access_type': 'offline',
+                    'prompt': 'consent',
+                    'state': session_id
+                }
+                
+                # Log all parameters being sent to Google
+                print("🔗 GOOGLE OAUTH PARAMETERS:")
+                print(f"🔗 Google OAuth URL: https://accounts.google.com/o/oauth2/v2/auth")
+                print(f"🔗 Parameters being sent to Google:")
+                for key, value in params.items():
+                    if key == 'scope':
+                        print(f"🔗   {key}: {value}")
+                    else:
+                        print(f"🔗   {key}: {value}")
+                
+                auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+                print(f"🔗 Complete Google OAuth URL: {auth_url}")
+                
+                return auth_url
+            
+            code_verifier = generate_code_verifier()
+            code_challenge = generate_code_challenge(code_verifier)
+            
+            # Store code verifier for later use
+            session_id = str(uuid.uuid4())
+            # Note: In production, use Redis or database instead of global variable
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            active_sessions[session_id] = {
+                'code_verifier': code_verifier,
+                'timestamp': time.time()
+            }
+            
+            # Determine redirect URI for logging
+            redirect_uri, is_local = get_redirect_uri()
+            
+            auth_url = build_auth_url(code_challenge, session_id)
+            
+            print(f"Generated OAuth URL for session: {session_id}")
+            print(f"🔧 Mode: {'LOCAL' if is_local else 'PRODUCTION'}")
+            print(f"🔧 Redirect URI: {redirect_uri}")
+            
+            return {
+                'authUrl': auth_url,
+                'sessionId': session_id,
+                'expiresIn': 600,  # 10 minutes
+                'message': 'Use this URL for OAuth flow'
+            }
+        except Exception as error:
+            print(f"Error generating OAuth URL: {error}")
+            return {'error': 'Failed to generate OAuth URL'}, 500
+
+class OAuthCallback(Resource):
+    def get(self):
+        """Handle OAuth callback from Google (GET request)"""
+        print("🔄 OAUTH CALLBACK ENDPOINT HIT!")
+        print(f"🔄 Request from: {request.remote_addr}")
+        print(f"🔄 User-Agent: {request.headers.get('User-Agent')}")
+        
+        try:
+            code = request.args.get('code')
+            state = request.args.get('state')
+            
+            print(f"🔄 Query params - code: {code}, state: {state}")
+            
+            if not code or not state:
+                print("❌ Missing code or state in query parameters")
+                return {'error': 'Missing code or state'}, 400
+            
+            # Get stored code verifier for PKCE
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            session = active_sessions.get(state)
+            if not session:
+                print(f"❌ Session not found for state: {state}")
+                return {'error': 'Invalid or expired session'}, 400
+            
+            code_verifier = session.get('code_verifier')
+            if not code_verifier:
+                print(f"❌ Code verifier not found for session: {state}")
+                return {'error': 'Missing code verifier'}, 400
+            
+            # Exchange code for tokens with Google (using PKCE)
+            # Use dynamic redirect URI based on environment
+            redirect_uri, is_local = get_redirect_uri()
+            token_data = {
+                'code': code,
+                'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
+                'client_secret': os.getenv('REACT_APP_GOOGLE_CLIENT_SECRET_WEB'),
+                'redirect_uri': redirect_uri,  # Use configured redirect URI
+                'grant_type': 'authorization_code',
+                'code_verifier': code_verifier  # Add PKCE code verifier
+            }
+            
+            print("🌐 Making request to Google OAuth token endpoint")
+            print(f"🔗 URL: https://oauth2.googleapis.com/token")
+            print(f"🔗 Token data being sent to Google:")
+            for key, value in token_data.items():
+                if key == 'code_verifier':
+                    print(f"🔗   {key}: {value[:10]}...{value[-10:] if len(value) > 20 else value}")
+                else:
+                    print(f"🔗   {key}: {value}")
+            
+            import requests
+            response = requests.post(
+                'https://oauth2.googleapis.com/token',
+                data=token_data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            )
+            
+            if response.status_code != 200:
+                print(f"❌ Google token exchange failed: {response.text}")
+                return {'error': 'Token exchange failed'}, 500
+            
+            tokens = response.json()
+            print("✅ Successfully exchanged code for tokens")
+            print(f"🔑 Tokens received: {json.dumps(tokens, indent=2)}")
+            
+            # Store tokens with state for later retrieval
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            print(f"🔍 DEBUG: About to store tokens for state: {state}")
+            print(f"🔍 DEBUG: Current active_sessions before storing: {list(active_sessions.keys())}")
+            
+            if state:
+                active_sessions[state] = {
+                    'tokens': tokens,
+                    'timestamp': time.time()
+                }
+                print(f"💾 Tokens stored for state: {state}")
+                print(f"💾 Stored tokens: {json.dumps(tokens, indent=2)}")
+                print(f"💾 Active sessions now contains: {list(active_sessions.keys())}")
+                print(f"💾 Session data stored: {json.dumps(active_sessions[state], indent=2)}")
+            else:
+                print(f"❌ No state provided, cannot store tokens")
+            
+            # Redirect to frontend with session ID
+            from flask import redirect
+            frontend_url = f"https://capshnz.com/photos/picker?sessionId={state}"
+            print(f"🌐 Redirecting to frontend: {frontend_url}")
+            return redirect(frontend_url, code=302)
+            
+        except Exception as error:
+            print(f"❌ Error in OAuth callback: {error}")
+            return {'error': 'OAuth callback failed'}, 500
+
+class OAuthToken(Resource):
+    def get(self, session_id=None):
+        """Get stored tokens for a session (GET request)"""
+        print("🔑 OAUTH TOKEN RETRIEVAL ENDPOINT HIT!")
+        print(f"🔑 Request from: {request.remote_addr}")
+        print(f"🔑 User-Agent: {request.headers.get('User-Agent')}")
+        
+        try:
+            # Get session ID from URL path or query parameter
+            if not session_id:
+                session_id = request.args.get('sessionId')
+            
+            print(f"🔑 Session ID: {session_id}")
+            
+            if not session_id:
+                print("❌ Missing sessionId")
+                return {'error': 'Missing sessionId'}, 400
+            
+            # Retrieve tokens for the session
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            print(f"🔍 DEBUG: Looking for session: {session_id}")
+            print(f"🔍 DEBUG: Available sessions: {list(active_sessions.keys())}")
+            print(f"🔍 DEBUG: Total sessions count: {len(active_sessions)}")
+            
+            session = active_sessions.get(session_id)
+            if not session:
+                print(f"❌ Session not found: {session_id}")
+                print(f"❌ Available sessions: {list(active_sessions.keys())}")
+                return {'error': 'Session not found'}, 404
+            
+            print(f"✅ Session found: {session_id}")
+            print(f"🔍 DEBUG: Session data keys: {list(session.keys())}")
+            
+            tokens = session.get('tokens')
+            if not tokens:
+                print(f"❌ No tokens found for session: {session_id}")
+                print(f"❌ Session contains: {list(session.keys())}")
+                return {'error': 'No tokens found'}, 404
+            
+            print(f"✅ Retrieved tokens for session: {session_id}")
+            print(f"🔑 Tokens being returned: {json.dumps(tokens, indent=2)}")
+            
+            response_data = {
+                'success': True,
+                'sessionId': session_id,
+                'tokens': tokens
+            }
+            
+            print(f"🔑 Full response being returned: {json.dumps(response_data, indent=2)}")
+            print(f"🔑 Response size: {len(json.dumps(response_data))} bytes")
+            print(f"🔑 Response status: 200 OK")
+            print(f"🔑 Response headers: Content-Type: application/json")
+            return response_data
+            
+        except Exception as error:
+            print(f"❌ Error retrieving tokens: {error}")
+            return {'error': 'Failed to retrieve tokens'}, 500
+
+    def post(self):
+        """Exchange OAuth code for tokens (for mobile apps)"""
+        print("🎫 OAUTH TOKEN EXCHANGE ENDPOINT HIT!")
+        print(f"🎫 Request from: {request.remote_addr}")
+        print(f"🎫 User-Agent: {request.headers.get('User-Agent')}")
+        
+        try:
+            data = request.get_json()
+            code = data.get('code')
+            state = data.get('state')
+            
+            print(f"🎫 Request body: {json.dumps(data, indent=2)}")
+            
+            if not code:
+                print("❌ Missing code in request")
+                return {'error': 'Missing code'}, 400
+            
+            # Get stored code verifier
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            session = active_sessions.get(state)
+            if not session:
+                print("❌ Invalid or expired state parameter")
+                return {'error': 'Invalid or expired session'}, 400
+            
+            # Exchange code for tokens
+            token_data = {
+                'code': code,
+                'client_id': os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB'),
+                'client_secret': os.getenv('REACT_APP_GOOGLE_CLIENT_SECRET_WEB'),
+                'redirect_uri': os.getenv('REDIRECT_URI', 'http://localhost:4030/oauth2/callback'),
+                'grant_type': 'authorization_code',
+                'code_verifier': session['code_verifier']
+            }
+            
+            print("🌐 Making request to Google OAuth token endpoint")
+            print(f"🔗 URL: https://oauth2.googleapis.com/token")
+            
+            import requests
+            response = requests.post(
+                'https://oauth2.googleapis.com/token',
+                data=token_data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            )
+            
+            if response.status_code != 200:
+                print(f"❌ Token exchange failed: {response.text}")
+                return {'error': 'Token exchange failed', 'details': response.text}, 500
+            
+            tokens = response.json()
+            print("✅ Successfully exchanged code for tokens")
+            print(f"🔑 Tokens received: {json.dumps(tokens, indent=2)}")
+            
+            # Store tokens with state for later retrieval
+            if state:
+                active_sessions[state].update({
+                    'tokens': tokens,
+                    'timestamp': time.time()
+                })
+                print(f"💾 Tokens stored for state: {state}")
+            
+            return {'success': True, **tokens}
+            
+        except Exception as error:
+            print(f"❌ Error exchanging code: {error}")
+            return {'error': 'Token exchange failed'}, 500
+
+class PickerSelection(Resource):
+    def post(self):
+        """Store selected photos from Google Photo Picker"""
+        print("📸 PICKER SELECTION ENDPOINT HIT!")
+        print(f"📸 Request from: {request.remote_addr}")
+        print(f"📸 User-Agent: {request.headers.get('User-Agent')}")
+        
+        try:
+            data = request.get_json()
+            session_id = data.get('sessionId')
+            selected_photos = data.get('photos', [])
+            
+            print(f"📸 Session ID: {session_id}")
+            print(f"📸 Selected photos count: {len(selected_photos)}")
+            print(f"📸 Photos data: {json.dumps(selected_photos, indent=2)}")
+            
+            if not session_id:
+                print("❌ Missing sessionId in request")
+                return {'error': 'Missing sessionId'}, 400
+            
+            if not selected_photos:
+                print("❌ No photos selected")
+                return {'error': 'No photos selected'}, 400
+            
+            # Store selected photos temporarily using the session ID
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            if session_id in active_sessions:
+                active_sessions[session_id]['selected_photos'] = selected_photos
+                active_sessions[session_id]['timestamp'] = time.time()
+                print(f"💾 Photos stored for session: {session_id}")
+            else:
+                print(f"❌ Session not found: {session_id}")
+                return {'error': 'Invalid session'}, 400
+            
+            # Return success response with deep link for frontend
+            return {
+                'success': True,
+                'message': f'Successfully stored {len(selected_photos)} photos',
+                'sessionId': session_id,
+                'photoCount': len(selected_photos),
+                'deepLink': f"googleapidemo://photos/selection?sessionId={session_id}"
+            }
+            
+        except Exception as error:
+            print(f"❌ Error storing photos: {error}")
+            return {'error': 'Failed to store photos'}, 500
+
+class PickerResult(Resource):
+    def get(self):
+        """Get selected photos for a session"""
+        print("📋 PICKER RESULT ENDPOINT HIT!")
+        print(f"📋 Request from: {request.remote_addr}")
+        print(f"📋 User-Agent: {request.headers.get('User-Agent')}")
+        
+        try:
+            session_id = request.args.get('sessionId')
+            
+            print(f"📋 Session ID: {session_id}")
+            
+            if not session_id:
+                print("❌ Missing sessionId parameter")
+                return {'error': 'Missing sessionId parameter'}, 400
+            
+            # Retrieve selected photos for the session
+            global active_sessions
+            if 'active_sessions' not in globals():
+                active_sessions = {}
+            
+            session = active_sessions.get(session_id)
+            if not session:
+                print(f"❌ Session not found: {session_id}")
+                return {'error': 'Session not found'}, 404
+            
+            selected_photos = session.get('selected_photos', [])
+            print(f"📋 Retrieved {len(selected_photos)} photos for session: {session_id}")
+            
+            return {
+                'success': True,
+                'sessionId': session_id,
+                'photos': selected_photos,
+                'photoCount': len(selected_photos)
+            }
+            
+        except Exception as error:
+            print(f"❌ Error retrieving photos: {error}")
+            return {'error': 'Failed to retrieve photos'}, 500
+
+class CreatePhotoSession(Resource):
+    def post(self):
+        """Create a new Photos Picker session"""
+        print("📸 CREATE PHOTO SESSION ENDPOINT HIT!")
+        print(f"📸 Request from: {request.remote_addr}")
+        
+        try:
+            data = request.get_json()
+            access_token = data.get('accessToken')
+            
+            if not access_token:
+                print("❌ Missing access token")
+                return {'error': 'Missing access token'}, 400
+            
+            print("📸 Creating Photos Picker session with Google API...")
+            
+            # Call Google Photos Picker API to create session
+            response = req_lib.post(
+                'https://photospicker.googleapis.com/v1/sessions',
+                json={},
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                    'Content-Type': 'application/json',
+                }
+            )
+            
+            if response.status_code != 200:
+                print(f"❌ Google API error: {response.text}")
+                return {
+                    'error': response.json() if response.text else 'Failed to create session',
+                    'status': response.status_code
+                }, response.status_code
+            
+            session_data = response.json()
+            print(f"✅ Session created: {session_data.get('id')}")
+            
+            return session_data, 200
+            
+        except Exception as error:
+            print(f"❌ Error creating session: {error}")
+            return {'error': str(error)}, 500
+
+class GetPhotoSession(Resource):
+    def get(self, session_id):
+        """Poll a Photos Picker session to check if user selected photos"""
+        print(f"📊 POLLING SESSION: {session_id}")
+        
+        try:
+            access_token = request.headers.get('Authorization')
+            if not access_token:
+                print("❌ Missing Authorization header")
+                return {'error': 'Missing access token'}, 400
+            
+            # Remove 'Bearer ' prefix if present
+            if access_token.startswith('Bearer '):
+                access_token = access_token[7:]
+            
+            print(f"📊 Checking session status...")
+            
+            # Call Google Photos Picker API to get session status
+            response = req_lib.get(
+                f'https://photospicker.googleapis.com/v1/sessions/{session_id}',
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                }
+            )
+            
+            if response.status_code != 200:
+                print(f"❌ Google API error: {response.text}")
+                return {
+                    'error': response.json() if response.text else 'Failed to poll session',
+                }, response.status_code
+            
+            session_data = response.json()
+            print(f"📋 Session status: mediaItemsSet={session_data.get('mediaItemsSet')}")
+            
+            return session_data, 200
+            
+        except Exception as error:
+            print(f"❌ Error polling session: {error}")
+            return {'error': str(error)}, 500
+
+class GetSessionMediaItems(Resource):
+    def get(self, session_id):
+        """Fetch media items from a Photos Picker session using Library API"""
+        print(f"📥 FETCHING MEDIA ITEMS FOR SESSION: {session_id}")
+        
+        try:
+            access_token = request.headers.get('Authorization')
+            if not access_token:
+                print("❌ Missing Authorization header")
+                return {'error': 'Missing access token'}, 400
+            
+            # Remove 'Bearer ' prefix if present
+            if access_token.startswith('Bearer '):
+                access_token = access_token[7:]
+            
+            print(f"🔑 Token received (first 20 chars): {access_token[:20]}...")
+            
+            # IMPORTANT: First verify what scopes this token actually has
+            print("🔍 Verifying token scopes...")
+            token_info_response = req_lib.get(
+                f'https://oauth2.googleapis.com/tokeninfo?access_token={access_token}'
+            )
+            
+            if token_info_response.status_code == 200:
+                token_info = token_info_response.json()
+                print(f"✅ Token scopes: {token_info.get('scope', 'NO SCOPES FOUND')}")
+                
+                # Check if we have the library scope
+                scopes = token_info.get('scope', '')
+                has_library_scope = 'photoslibrary.readonly' in scopes
+                has_picker_scope = 'photospicker.mediaitems.readonly' in scopes
+                
+                print(f"📋 Has library scope: {has_library_scope}")
+                print(f"📋 Has picker scope: {has_picker_scope}")
+                
+                if not has_library_scope:
+                    print("❌ Token missing required library scope!")
+                    return {
+                        'error': 'Token missing required scope',
+                        'details': 'The access token does not have photoslibrary.readonly scope',
+                        'currentScopes': scopes.split(),
+                        'requiredScopes': [
+                            'https://www.googleapis.com/auth/photoslibrary.readonly',
+                            'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
+                        ],
+                        'solution': 'Request a new token with both scopes in the frontend'
+                    }, 403
+            else:
+                print(f"⚠️ Could not verify token: {token_info_response.text}")
+            
+            print(f"📥 Step 1: Verify session has media items...")
+            
+            # Step 1: Verify the session has media items selected
+            session_response = req_lib.get(
+                f'https://photospicker.googleapis.com/v1/sessions/{session_id}',
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                }
+            )
+            
+            if session_response.status_code != 200:
+                print(f"❌ Session verification failed: {session_response.text}")
+                return {'error': 'Failed to verify session'}, session_response.status_code
+            
+            session_data = session_response.json()
+            print(f"📋 Session status: mediaItemsSet={session_data.get('mediaItemsSet')}")
+            
+            if not session_data.get('mediaItemsSet'):
+                print("❌ No media items selected yet")
+                return {'error': 'No media items selected yet'}, 400
+            
+            # Step 2: Fetch media items from Photos Library API
+            print("📸 Fetching media items from Library API...")
+            
+            library_response = req_lib.post(
+                'https://photoslibrary.googleapis.com/v1/mediaItems:search',
+                json={
+                    'pageSize': 100,
+                    'filters': {
+                        'mediaTypeFilter': {
+                            'mediaTypes': ['PHOTO']
+                        }
+                    }
+                },
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                    'Content-Type': 'application/json',
+                }
+            )
+            
+            print(f"📊 Library API response status: {library_response.status_code}")
+            
+            if library_response.status_code != 200:
+                error_data = library_response.json() if library_response.text else {}
+                error_message = error_data.get('error', {}).get('message', 'Failed to fetch media items')
+                print(f"❌ Library API error: {library_response.text}")
+                
+                # Check if it's a permission issue
+                if library_response.status_code == 403:
+                    return {
+                        'error': 'Permission denied',
+                        'message': error_message,
+                        'details': error_data,
+                        'suggestion': 'The token does not have permission to read from Photos Library. Make sure to request BOTH scopes together when getting the token.',
+                        'requiredScopes': [
+                            'https://www.googleapis.com/auth/photoslibrary.readonly',
+                            'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
+                        ],
+                        'debugInfo': {
+                            'sessionId': session_id,
+                            'tokenPresent': bool(access_token),
+                            'apiEndpoint': 'photoslibrary.googleapis.com/v1/mediaItems:search'
+                        }
+                    }, 403
+                
+                return {
+                    'error': error_message,
+                    'details': error_data,
+                }, library_response.status_code
+            
+            library_data = library_response.json()
+            media_items = library_data.get('mediaItems', [])
+            print(f"✅ Fetched {len(media_items)} photos from Library API")
+            
+            if len(media_items) == 0:
+                print("⚠️ No media items returned from Library API")
+                return {
+                    'error': 'No photos found',
+                    'message': 'The Library API returned no photos. This could mean: 1) The user has no photos in their library, 2) The token lacks proper permissions, or 3) The selected photos are not accessible.',
+                    'suggestion': 'Try selecting different photos or check that photos exist in the Google Photos account.'
+                }, 404
+            
+            # Format response to match expected structure
+            formatted_items = []
+            for item in media_items:
+                base_url = item.get('baseUrl', '')
+                # Add size parameter for better quality
+                image_url = f"{base_url}=w2048-h2048" if base_url else ''
+                
+                formatted_items.append({
+                    'mediaFile': {
+                        'baseUrl': image_url,
+                        'mimeType': item.get('mimeType'),
+                        'filename': item.get('filename'),
+                        'mediaFileMetadata': item.get('mediaMetadata'),
+                    },
+                    'baseUrl': image_url,
+                    'url': image_url,
+                })
+            
+            print(f"✅ Returning {len(formatted_items)} formatted photos")
+            
+            return {
+                'mediaItems': formatted_items,
+                'count': len(formatted_items)
+            }, 200
+            
+        except Exception as error:
+            print(f"❌ Error fetching media items: {error}")
+            import traceback
+            traceback.print_exc()
+            return {'error': str(error)}, 500
+
+class ProxyImage(Resource):
+    def get(self):
+        """Proxy an image URL through the backend"""
+        print("🔁 IMAGE PROXY ENDPOINT HIT!")
+        
+        try:
+            url = request.args.get('url')
+            token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+            
+            if not url:
+                print("❌ Missing url parameter")
+                return {'error': 'Missing url query parameter'}, 400
+            
+            print(f"🔁 Proxying image URL: {url[:50]}...")
+            
+            headers = {}
+            if token:
+                headers['Authorization'] = f'Bearer {token}'
+            
+            # Fetch the image
+            response = req_lib.get(
+                url,
+                headers=headers,
+                stream=True,
+                allow_redirects=True
+            )
+            
+            if response.status_code != 200:
+                print(f"❌ Image fetch failed: {response.status_code}")
+                return {'error': 'Failed to get image'}, response.status_code
+            
+            # Forward content-type from upstream
+            content_type = response.headers.get('content-type', 'application/octet-stream')
+            
+            from flask import Response as FlaskResponse
+            def generate():
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+            
+            print(f"✅ Successfully proxying image")
+            return FlaskResponse(
+                generate(),
+                mimetype=content_type,
+                headers={
+                    'Cache-Control': 'public, max-age=3600'
+                }
+            )
+            
+        except Exception as error:
+            print(f"❌ Error proxying image: {error}")
+            return {'error': str(error)}, 500
+
+class GetPickerMediaItems(Resource):
+    def get(self):
+        """Get media items selected via Photos Picker (uses session ID from query param)"""
+        print("📥 GET PICKER MEDIA ITEMS ENDPOINT HIT!")
+        
+        try:
+            session_id = request.args.get('sessionId')
+            access_token = request.headers.get('Authorization')
+            
+            # Remove 'Bearer ' prefix if present
+            if access_token.startswith('Bearer '):
+                access_token = access_token[7:]
+            
+            print(f"📥 Fetching media for session: {session_id}")
+            
+            # Step 1: Verify the session has media items
+            session_response = req_lib.get(
+                f'https://photospicker.googleapis.com/v1/sessions/{session_id}/mediaItems',
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                }
+            )
+            
+            if session_response.status_code != 200:
+                print(f"❌ Session verification failed: {session_response.text}")
+                return {'error': 'Failed to verify session'}, session_response.status_code
+            
+            session_data = session_response.json()
+            print(f"📋 Session verification: mediaItemsSet={session_data.get('mediaItemsSet')}")
+            
+            if not session_data.get('mediaItemsSet'):
+                print("❌ No media items selected yet")
+                return {'error': 'No media items selected yet'}, 400
+            
+            # Step 2: Get recent photos from Library API as the picker doesn't directly return them
+            # Note: This is a limitation of the Photos Picker API - it doesn't provide the exact
+            # selected photos, only signals that photos were picked
+            print("📸 Fetching recent photos from Library API...")
+            
+            # Get media items directly from the picker session
+            picker_items_response = req_lib.get(
+                f'https://photospicker.googleapis.com/v1/sessions/{session_id}/mediaItems',
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                }
+            )
+            
+            response = req_lib.get(
+                f'https://photospicker.googleapis.com/v1/sessions/{session_id}/mediaItems',
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                }
+            )
+            
+            if response.status_code != 200:
+                error_data = response.json() if response.text else {}
+                error_message = error_data.get('error', {}).get('message', 'Failed to fetch media items')
+                print(f"❌ API error: {response.text}")
+                
+                return {
+                    'error': error_message,
+                    'details': error_data,
+                    'suggestion': 'Please make sure you granted the Photos Library permission when signing in.',
+                }, response.status_code
+            
+            data = response.json()
+            media_items = data.get('mediaItems', [])
+            print(f"✅ Fetched {len(media_items)} photos from Library API")
+            
+            # Format response to match expected structure
+            formatted_items = []
+            for item in media_items:
+                formatted_items.append({
+                    'mediaFile': {
+                        'baseUrl': item.get('baseUrl'),
+                        'mimeType': item.get('mimeType'),
+                        'filename': item.get('filename'),
+                        'mediaFileMetadata': item.get('mediaMetadata'),
+                    },
+                    'baseUrl': item.get('baseUrl'),
+                    'url': item.get('baseUrl'),  # Add top-level url field
+                })
+            
+            return {
+                'mediaItems': formatted_items,
+                'count': len(formatted_items)
+            }, 200
+            
+        except Exception as error:
+            print(f"❌ Error fetching picker media items: {error}")
+            return {'error': str(error)}, 500
+
+    def get(self):
+        """Proxy an image URL through the backend"""
+        print("🔁 IMAGE PROXY ENDPOINT HIT!")
+        
+        try:
+            url = request.args.get('url')
+            token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+            
+            if not url:
+                print("❌ Missing url parameter")
+                return {'error': 'Missing url query parameter'}, 400
+            
+            print(f"🔁 Proxying image URL: {url[:50]}...")
+            
+            headers = {}
+            if token:
+                headers['Authorization'] = f'Bearer {token}'
+            
+            # Fetch the image
+            response = req_lib.get(
+                url,
+                headers=headers,
+                stream=True,
+                allow_redirects=True
+            )
+            
+            if response.status_code != 200:
+                print(f"❌ Image fetch failed: {response.status_code}")
+                return {'error': 'Failed to get image'}, response.status_code
+            
+            # Forward content-type from upstream
+            content_type = response.headers.get('content-type', 'application/octet-stream')
+            
+            from flask import Response as FlaskResponse
+            def generate():
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+            
+            print(f"✅ Successfully proxying image")
+            return FlaskResponse(
+                generate(),
+                mimetype=content_type,
+                headers={
+                    'Cache-Control': 'public, max-age=3600'
+                }
+            )
+            
+        except Exception as error:
+            print(f"❌ Error proxying image: {error}")
+            return {'error': str(error)}, 500
+    def get(self):
+        """Proxy an image URL through the backend"""
+        print("🔁 IMAGE PROXY ENDPOINT HIT!")
+        
+        try:
+            url = request.args.get('url')
+            token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+            
+            if not url:
+                print("❌ Missing url parameter")
+                return {'error': 'Missing url query parameter'}, 400
+            
+            print(f"🔁 Proxying image URL: {url[:50]}...")
+            
+            headers = {}
+            if token:
+                headers['Authorization'] = f'Bearer {token}'
+            
+            # Fetch the image
+            response = req_lib.get(
+                url,
+                headers=headers,
+                stream=True,
+                allow_redirects=True
+            )
+            
+            if response.status_code != 200:
+                print(f"❌ Image fetch failed: {response.status_code}")
+                return {'error': 'Failed to get image'}, response.status_code
+            
+            # Forward content-type from upstream
+            content_type = response.headers.get('content-type', 'application/octet-stream')
+            
+            from flask import Response as FlaskResponse
+            def generate():
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+            
+            print(f"✅ Successfully proxying image")
+            return FlaskResponse(
+                generate(),
+                mimetype=content_type,
+                headers={
+                    'Cache-Control': 'public, max-age=3600'
+                }
+            )
+            
+        except Exception as error:
+            print(f"❌ Error proxying image: {error}")
+            return {'error': str(error)}, 500
+
+
+# NOW UPDATE THE REGISTRATION SECTION
+# Replace the line: api.add_resource(CreatePhotoSession, "/api/photos/create-session")
+# With these lines:
+api.add_resource(CreatePhotoSession, "/api/photos/create-session")
+api.add_resource(GetPhotoSession, "/api/photos/session/<string:session_id>")
+api.add_resource(GetSessionMediaItems, "/api/photos/session/<string:session_id>/mediaItems")
+api.add_resource(GetPickerMediaItems, "/api/photos/picker/session/<string:session_id>/mediaItems")  
+api.add_resource(ProxyImage, "/api/photos/proxy-image")
+
+print("✅ Google Photos Picker endpoints registered successfully")
+
+
+# Register photo-picker resources
+api.add_resource(OAuthURL, "/api/oauth/url")
+api.add_resource(OAuthCallback, "/api/oauth/callback")
+api.add_resource(OAuthToken, "/api/oauth/token", "/api/oauth/token/<string:session_id>")
+api.add_resource(PickerSelection, "/api/picker/selection")
+api.add_resource(PickerResult, "/api/picker/result")
+print("✅ Photo-picker resources registered successfully")
+
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=4030)
+    print("🚀 Starting Caption API with Photo-Picker Integration")
+    print("📱 Ready for both web and mobile apps")
+    print("🏥 Health endpoint: http://127.0.0.1:4030/health")
+    
+    # Detect environment and show configuration
+    print("\n🔧 ENVIRONMENT DETECTION:")
+    print("🔧 Mode: LOCAL DEVELOPMENT")
+    print(f"🔧 Redirect URI: {os.getenv('REDIRECT_URI_LOCAL', 'http://localhost:4030/api/oauth/callback')}")
+    
+    app.run(host="127.0.0.1", port=4030, debug=True)
