@@ -55,6 +55,13 @@ from hashlib import sha512
 from math import ceil
 import string
 
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+GOOGLE_CLIENT_ID = os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB', '')
+GOOGLE_CLIENT_SECRET = os.getenv('REACT_APP_GOOGLE_CLIENT_SECRET_WEB', '')
+
 # BING API KEY
 # Import Bing API key into bing_api_key.py
 
@@ -114,7 +121,11 @@ CORS(app)
 
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:3000", "https://capshnz.com"],
+        "origins": [
+            "http://localhost:3000",
+            "https://capshnz.com",
+            "https://bmarz6chil.execute-api.us-west-1.amazonaws.com"
+        ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "expose_headers": ["Content-Type", "Authorization"],
@@ -3316,6 +3327,7 @@ class GetPhotoSession(Resource):
             
             session_data = response.json()
             print(f"📋 Session status: mediaItemsSet={session_data.get('mediaItemsSet')}")
+            print(f"🔑 Session ID2: {session_id}")
             
             return session_data, 200
             
@@ -3754,6 +3766,18 @@ api.add_resource(OAuthToken, "/api/oauth/token", "/api/oauth/token/<string:sessi
 api.add_resource(PickerSelection, "/api/picker/selection")
 api.add_resource(PickerResult, "/api/picker/result")
 print("✅ Photo-picker resources registered successfully")
+
+class PhotosHealthCheck(Resource):
+    def get(self):
+        """Health check for photos endpoints"""
+        return {
+            'status': 'OK',
+            'message': 'Photos API is running',
+            'timestamp': getNow()
+        }, 200
+
+# Register it
+api.add_resource(PhotosHealthCheck, "/api/photos/health")
 
 if __name__ == "__main__":
     print("🚀 Starting Caption API with Photo-Picker Integration")
