@@ -72,6 +72,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from random import randint
+import awsgi
+
+def lambda_handler(event, context):
+   return awsgi.response(app, event, context, base64_content_types={"image/png"})
 
 RDS_HOST = "io-mysqldb8.cxjnrciilyjq.us-west-1.rds.amazonaws.com"
 RDS_PORT = 3306

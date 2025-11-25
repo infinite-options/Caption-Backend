@@ -6,6 +6,7 @@ aniso8601==9.0.1
 argcomplete==3.5.2
 async-timeout==4.0.3
 attrs==23.2.0
+awsgi==0.0.5
 beautifulsoup4==4.12.3
 blinker==1.9.0
 boto3==1.35.76
@@ -23,6 +24,7 @@ Flask-Mail==0.10.0
 Flask-RESTful==0.3.10
 frozenlist==1.5.0
 hjson==3.1.0
+httptools==0.7.1
 idna==3.10
 importlib-metadata==6.11.0
 itsdangerous==2.2.0
@@ -54,8 +56,9 @@ troposphere==4.8.3
 twilio==8.13.0
 typing_extensions==4.12.2
 urllib3==1.26.20
+uvloop==0.22.1
+websockets==15.0.1
 Werkzeug==2.3.8
-wheel==0.45.1
 yarl==1.18.3
 zappa==0.59.0
 zipp==3.21.0

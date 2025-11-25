@@ -35,3 +35,9 @@ sample.py
 # __ files
 __pycache__/
 test.py
+
+# build folder
+build/
+
+# zip files
+*.zip
