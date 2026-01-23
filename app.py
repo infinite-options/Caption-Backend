@@ -41,6 +41,7 @@ CORS(app, origins=[
     "exp://localhost:19000",  # Expo development
     "exp://192.168.1.100:19000",  # Expo on local network
 ], supports_credentials=True)
+        "http://localhost:19006",
 
 # Store active sessions (in production, use Redis)
 active_sessions: Dict[str, Dict] = {}

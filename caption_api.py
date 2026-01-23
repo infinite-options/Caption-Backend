@@ -907,6 +907,122 @@ class selectDeck(Resource):
             disconnect(conn)
 
 
+class uploadDeviceImage(Resource):
+    def post(self):
+        response = {}
+        uploaded_images = []
+        try:
+            conn = connect()
+
+            print(f"Upload Device Image Request")
+            print(f"Content-Type: {request.content_type}")
+            print(f"Files: {request.files}")
+            print(f"Form: {request.form}")
+
+            # Get the uploaded file
+            image_files = request.files.getlist("image_files") or request.files.getlist(
+                "file"
+            )
+
+            if not image_files or len(image_files) == 0:
+                return {"message": "No image file provided"}, 400
+
+            # deck name
+            deck_name = request.form.get("deck_name", "")
+
+            for image_file in image_files:
+                if not allowed_file(image_file.filename):
+                    print(f"skiping invalid images")
+                    continue
+                new_image_uid = get_new_imageUID(conn)
+                print(f"new image uid is ", {new_image_uid})
+                file_extension = image_file.filename.rsplit(".", 1)[1].lower()
+                key = f"caption_image/{new_image_uid}.{file_extension}"
+
+                # s3 key with file
+                image_url = helper_upload_user_img(image_file, key)
+                print(f"uploaded to s3:{image_url}")
+
+                if not image_url:
+                    print(f"failed to upload,{image_file.filename}")
+                    continue
+                image_title = image_file.filename
+                image_description = "Uploaded image from device"
+
+                # Save to database
+                add_image_query = (
+                    """
+                    INSERT INTO captions.image
+                    SET image_uid = \'"""
+                    + new_image_uid
+                    + """\',
+                        image_title = \'"""
+                    + image_title.replace("'", "''")
+                    + """\',
+                        image_url = \'"""
+                    + image_url
+                    + """\',
+                        image_cost = '0',
+                        image_description = \'"""
+                    + image_description.replace("'", "''")
+                    + """\'
+                    """
+                )
+                image_response = execute(add_image_query, "post", conn)
+                print(f"Database insert result: {image_response}")
+
+                # To get details of both files
+                if image_response.get("code") == 281:
+                    uploaded_images.append(
+                        {
+                            "image_uid": new_image_uid,
+                            "image_url": image_url,
+                            "filename": image_file.filename,
+                        }
+                    )
+
+                if deck_name:
+                    get_deck_query = (
+                        """
+                        SELECT deck_image_uids
+                        FROM captions.deck
+                        WHERE deck_title = \'"""
+                        + deck_name
+                        + """\'
+                        """
+                    )
+                    deck_response = execute(get_deck_query, "get", conn)
+
+                    if deck_response.get("code") == 280 and deck_response["result"]:
+                        uid_string = deck_response["result"][0]["deck_image_uids"]
+
+                        if uid_string == "()":
+                            uid_string = '("' + new_image_uid + '")'
+                        else:
+                            uid_string = uid_string[:-1] + ', "' + new_image_uid + '")'
+
+                        update_deck_query = (
+                            """
+                            UPDATE captions.deck
+                            SET deck_image_uids = \'"""
+                            + uid_string
+                            + """\'
+                            WHERE deck_title = \'"""
+                            + deck_name
+                            + """\'
+                            """
+                        )
+                        execute(update_deck_query, "post", conn)
+
+            response["message"] = f"{len(uploaded_images)} images uploaded"
+            response["images"] = uploaded_images
+            response["total_uploaded"] = len(uploaded_images)
+            return response, 200
+        except Exception as e:
+            print(f"Error uploading device image: {str(e)}")
+            return {"message": f"Upload failed: {str(e)}"}, 500
+        finally:
+            disconnect(conn)
 class assignDeck(Resource):
     def post(self):
         response = {}
@@ -3724,6 +3840,7 @@ api.add_resource(getPlayers, "/api/v2/getPlayers/<string:game_code>")
 api.add_resource(decks, "/api/v2/decks/<string:user_uid>,<string:public_decks>")
 api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>,<string:round_number>")
 api.add_resource(selectDeck, "/api/v2/selectDeck")
+api.add_resource(uploadDeviceImage, "/api/v2/uploadDeviceImage")
 api.add_resource(assignDeck, "/api/v2/assignDeck")
 api.add_resource(changeRoundsAndDuration, "/api/v2/changeRoundsAndDuration")
 # api.add_resource(getImageInRound, "/api/v2/getImageInRound/<string:game_code>,<string:round_number>")
