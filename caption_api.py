@@ -116,6 +116,7 @@ CORS(app,
      origins=[
          "http://localhost:3000",  # React frontend
          "http://localhost:8081",  # Expo web
+         "http://localhost:19006",  # Expo web (main)
          "http://127.0.0.1:3000",  # Alternative localhost
          "http://127.0.0.1:4030",  # Backend itself
          "https://capshnz.com",    # Production frontend
