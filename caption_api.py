@@ -30,7 +30,14 @@ from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_mail import Mail, Message
 
-from prometheus_client import Counter, Summary, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
+from prometheus_client import (
+    Counter,
+    Summary,
+    Gauge,
+    generate_latest,
+    CollectorRegistry,
+    CONTENT_TYPE_LATEST,
+)
 import logging
 
 # from cnn_webscrape import lambda_handler
@@ -69,6 +76,7 @@ import pytz
 import pymysql
 import requests
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from random import randint
@@ -84,7 +92,6 @@ RDS_DB = "captions"
 # RDS_DB = os.getenv("RDS_DB")
 
 
-
 # app = Flask(__name__)
 app = Flask(__name__, template_folder="assets")
 
@@ -93,17 +100,17 @@ app = Flask(__name__, template_folder="assets")
 import stripe
 
 # STRIPE AND PAYPAL KEYS
-paypal_secret_test_key = os.getenv('paypal_secret_key_test')
-paypal_secret_live_key = os.getenv('paypal_secret_key_live')
+paypal_secret_test_key = os.getenv("paypal_secret_key_test")
+paypal_secret_live_key = os.getenv("paypal_secret_key_live")
 
-paypal_client_test_key = os.getenv('paypal_client_test_key')
-paypal_client_live_key = os.getenv('paypal_client_live_key')
+paypal_client_test_key = os.getenv("paypal_client_test_key")
+paypal_client_live_key = os.getenv("paypal_client_live_key")
 
-stripe_public_test_key = os.getenv('stripe_public_test_key')
-stripe_secret_test_key = os.getenv('stripe_secret_test_key')
+stripe_public_test_key = os.getenv("stripe_public_test_key")
+stripe_secret_test_key = os.getenv("stripe_secret_test_key")
 
-stripe_public_live_key = os.getenv('stripe_public_live_key')
-stripe_secret_live_key = os.getenv('stripe_secret_live_key')
+stripe_public_live_key = os.getenv("stripe_public_live_key")
+stripe_secret_live_key = os.getenv("stripe_secret_live_key")
 
 stripe.api_key = stripe_secret_test_key
 
@@ -112,34 +119,35 @@ stripe.api_key = stripe_secret_test_key
 
 
 # CORS configuration for cross-origin requests
-CORS(app, 
-     origins=[
-         "http://localhost:3000",  # React frontend
-         "http://localhost:8081",  # Expo web
-         "http://localhost:19006",  # Expo web (main)
-         "http://127.0.0.1:3000",  # Alternative localhost
-         "http://127.0.0.1:4030",  # Backend itself
-         "https://capshnz.com",    # Production frontend
-         "exp://localhost:19000",  # Expo development
-         "exp://192.168.1.100:19000"  # Expo on local network
-     ],
-     supports_credentials=True,
-     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+CORS(
+    app,
+    origins=[
+        "http://localhost:3000",  # React frontend
+        "http://localhost:8081",  # Expo web
+        "http://127.0.0.1:3000",  # Alternative localhost
+        "http://127.0.0.1:4030",  # Backend itself
+        "https://capshnz.com",  # Production frontend
+        "exp://localhost:19000",  # Expo development
+        "exp://192.168.1.100:19000",  # Expo on local network
+        "http://localhost:19006",
+    ],
+    supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+)
 
 # --------------- Mail Variables ------------------
-#This should be on Github -- should work wth environmental variables
+# This should be on Github -- should work wth environmental variables
 app.config["MAIL_USERNAME"] = os.getenv("SUPPORT_EMAIL")
 app.config["MAIL_PASSWORD"] = os.getenv("SUPPORT_PASSWORD")
 # print("Backend Running")
 # print(os.getenv("SUPPORT_EMAIL"))
 # print(os.getenv("RDS_DB"))
 
-#This should not be on Github -- should work on localhost
+# This should not be on Github -- should work on localhost
 # app.config['MAIL_USERNAME'] = "support@mealsfor..."
 # app.config['MAIL_USERNAME'] = "support@capshnz.com"
 # app.config['MAIL_PASSWORD'] = "Supportcapshnz1!"
-
 
 
 # Setting for mydomain.com
@@ -162,28 +170,32 @@ app.config["STRIPE_SECRET_KEY"] = os.getenv("STRIPE_SECRET_KEY")
 mail = Mail(app)
 
 # Google API Configuration
-GOOGLE_CLIENT_ID = os.getenv('REACT_APP_GOOGLE_CLIENT_ID_WEB')
-GOOGLE_CLIENT_SECRET = os.getenv('REACT_APP_GOOGLE_CLIENT_SECRET_WEB')
-REDIRECT_URI = os.getenv('REDIRECT_URI', 'http://localhost:3000')
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+GOOGLE_CLIENT_ID = os.getenv("REACT_APP_GOOGLE_CLIENT_ID_WEB")
+GOOGLE_CLIENT_SECRET = os.getenv("REACT_APP_GOOGLE_CLIENT_SECRET_WEB")
+REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:3000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # Store active sessions (in production, use Redis)
 active_sessions: Dict[str, Dict] = {}
 user_tokens: Dict[str, Dict] = {}
 
+
 # Utility functions for Google OAuth
 def base64url_encode(data: bytes) -> str:
     """Base64 URL encode without padding"""
-    return base64.urlsafe_b64encode(data).decode('utf-8').rstrip('=')
+    return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
+
 
 def generate_code_verifier() -> str:
     """Generate a cryptographically random code verifier"""
     return base64url_encode(secrets.token_bytes(32))
 
+
 def generate_code_challenge(verifier: str) -> str:
     """Generate code challenge from verifier using SHA256"""
-    digest = hashlib.sha256(verifier.encode('utf-8')).digest()
+    digest = hashlib.sha256(verifier.encode("utf-8")).digest()
     return base64url_encode(digest)
+
 
 # API
 api = Api(app)
@@ -192,7 +204,7 @@ api = Api(app)
 utc = pytz.utc
 
 # REQUEST_COUNTER = Counter(
-#                     'capshnz_http_requests_total', 
+#                     'capshnz_http_requests_total',
 #                     'Total HTTP requests by status code and endpoint',
 #                     ['endpoint', 'status_code', 'client_ip']
 #                 )
@@ -201,39 +213,58 @@ app_env = os.getenv("app_env")
 # print(app_env)
 
 if app_env == "production":
-    logging.getLogger('werkzeug').setLevel(logging.ERROR)
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     logger = logging.getLogger(__name__)
 else:
     # For non-production environments, use a simple print logger
     class PrintLogger:
-        def info(self, msg): print(f"INFO: {msg}")
-        def error(self, msg): print(f"ERROR: {msg}")
-        def warning(self, msg): print(f"WARNING: {msg}")
-        def debug(self, msg): print(f"DEBUG: {msg}")
+        def info(self, msg):
+            print(f"INFO: {msg}")
+
+        def error(self, msg):
+            print(f"ERROR: {msg}")
+
+        def warning(self, msg):
+            print(f"WARNING: {msg}")
+
+        def debug(self, msg):
+            print(f"DEBUG: {msg}")
+
     logger = PrintLogger()
 
 registry = CollectorRegistry()
 
 API_CALLS_TRACKER = Gauge(
-    'capshnz_api_calls_timestamp',
-    'API calls with timestamp tracking',
-    ['endpoint', 'client_ip', 'timestamp'],
-    registry=registry
+    "capshnz_api_calls_timestamp",
+    "API calls with timestamp tracking",
+    ["endpoint", "client_ip", "timestamp"],
+    registry=registry,
 )
 
 REQUEST_COUNTER = Counter(
-    'capshnz_http_requests_total',
-    'Total HTTP requests by method, endpoint, status code, and client IP',
-    ['timestamp', 'method', 'endpoint', 'status_code', 'client_ip', 'user_agent', 'request_size', 'response_size'],
-    registry=registry
+    "capshnz_http_requests_total",
+    "Total HTTP requests by method, endpoint, status code, and client IP",
+    [
+        "timestamp",
+        "method",
+        "endpoint",
+        "status_code",
+        "client_ip",
+        "user_agent",
+        "request_size",
+        "response_size",
+    ],
+    registry=registry,
 )
 
 API_CALL_HISTORY = Counter(
-    'capshnz_api_call_history',
-    'API calls with timestamp tracking for each IP',
-    ['endpoint', 'client_ip'],
-    registry=registry
+    "capshnz_api_call_history",
+    "API calls with timestamp tracking for each IP",
+    ["endpoint", "client_ip"],
+    registry=registry,
 )
 # API_CALL_HISTORY = Counter(
 #     'capshnz_api_call_history',
@@ -243,10 +274,10 @@ API_CALL_HISTORY = Counter(
 # )
 
 LATENCY_SUMMARY = Summary(
-    'capshnz_http_request_latency_seconds',
-    'Request latency by endpoint',
-    ['endpoint', 'method'],
-    registry=registry
+    "capshnz_http_request_latency_seconds",
+    "Request latency by endpoint",
+    ["endpoint", "method"],
+    registry=registry,
 )
 
 
@@ -254,11 +285,14 @@ LATENCY_SUMMARY = Summary(
 # def getToday(): return datetime.strftime(datetime.now(utc), "%Y-%m-%d")
 # def getNow(): return datetime.strftime(datetime.now(utc), "%Y-%m-%d %H:%M:%S")
 
+
 # # These statment return Day and Time in Local Time - Not sure about PST vs PDT
-def getToday(): return datetime.strftime(datetime.now(), "%Y-%m-%d")
+def getToday():
+    return datetime.strftime(datetime.now(), "%Y-%m-%d")
 
 
-def getNow(): return datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
+def getNow():
+    return datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
 
 
 # Not sure what these statments do
@@ -282,34 +316,36 @@ RDS_PW = "prashant"
 # RDS_PW = RdsPw()
 
 
-s3 = boto3.client('s3')
-s3_res = boto3.resource('s3')
-s3_cl = boto3.client('s3')
+s3 = boto3.client("s3")
+s3_res = boto3.resource("s3")
+s3_cl = boto3.client("s3")
 
 # aws s3 bucket where the image is stored
 # BUCKET_NAME = os.getenv('MEAL_IMAGES_BUCKET')
-BUCKET_NAME = 'iocaptions'
+BUCKET_NAME = "iocaptions"
 # allowed extensions for uploading a profile photo file
 ALLOWED_EXTENSIONS = set(["png", "jpg", "jpeg"])
 
+
 def allowed_file(filename):
     """Checks if the file is allowed to upload"""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 def helper_upload_user_img(file, key):
     # print("uploading image to s3 bucket.")
-    bucket = 'iocaptions'
+    bucket = "iocaptions"
     if file and allowed_file(file.filename):
         # filename = 'https://' + bucket+ '.s3.us-west-1.amazonaws.com/' \
         #            + str(bucket) + '/' + str(key)
-        filename = 'https://' + bucket+ '.s3.us-west-1.amazonaws.com/' + str(key)
+        filename = "https://" + bucket + ".s3.us-west-1.amazonaws.com/" + str(key)
 
         upload_file = s3.put_object(
             Bucket=bucket,
             Body=file,
             Key=key,
-            ACL='public-read',
-            ContentType='image/jpeg'
+            ACL="public-read",
+            ContentType="image/jpeg",
         )
         return filename
     return None
@@ -403,7 +439,9 @@ def execute(sql, cmd, conn, skipSerialization=False):
                 # Return status code of 281 for successful POST request
                 response["code"] = 281
             else:
-                response["message"] = "Request failed. Unknown or ambiguous instruction given for MySQL command."
+                response["message"] = (
+                    "Request failed. Unknown or ambiguous instruction given for MySQL command."
+                )
                 # Return status code of 480 for unknown HTTP method
                 response["code"] = 480
     except:
@@ -441,44 +479,50 @@ def runSelectQuery(query, cur):
 
 # RUN STORED PROCEDURES
 
+
 def get_new_gameUID(conn):
-    newGameQuery = execute("CALL captions.new_game_uid()", 'get', conn)
-    if newGameQuery['code'] == 280:
-        return newGameQuery['result'][0]['new_id']
+    newGameQuery = execute("CALL captions.new_game_uid()", "get", conn)
+    if newGameQuery["code"] == 280:
+        return newGameQuery["result"][0]["new_id"]
     return "Could not generate new game UID", 500
+
 
 def get_new_roundUID(conn):
-    newRoundQuery = execute("CALL captions.new_round_uid()", 'get', conn)
-    if newRoundQuery['code'] == 280:
-        return newRoundQuery['result'][0]['new_id']
+    newRoundQuery = execute("CALL captions.new_round_uid()", "get", conn)
+    if newRoundQuery["code"] == 280:
+        return newRoundQuery["result"][0]["new_id"]
     return "Could not generate new game UID", 500
 
+
 def get_new_userUID(conn):
-    newPurchaseQuery = execute("CALL captions.new_user_uid()", 'get', conn)
-    if newPurchaseQuery['code'] == 280:
-        return newPurchaseQuery['result'][0]['new_id']
+    newPurchaseQuery = execute("CALL captions.new_user_uid()", "get", conn)
+    if newPurchaseQuery["code"] == 280:
+        return newPurchaseQuery["result"][0]["new_id"]
     return "Could not generate new user UID", 500
 
+
 def get_new_historyUID(conn):
-    newHistoryQuery = execute("CALL captions.new_history_uid()", 'get', conn)
-    if newHistoryQuery['code'] == 280:
-        return newHistoryQuery['result'][0]['new_id']
+    newHistoryQuery = execute("CALL captions.new_history_uid()", "get", conn)
+    if newHistoryQuery["code"] == 280:
+        return newHistoryQuery["result"][0]["new_id"]
     return "Could not generate new history UID", 500
+
 
 def get_new_imageUID(conn):
     # print("getting new image")
-    newImageQuery = execute("CALL captions.new_image_uid()", 'get', conn)
+    newImageQuery = execute("CALL captions.new_image_uid()", "get", conn)
     # print(newImageQuery)
-    if newImageQuery['code'] == 280:
-        return newImageQuery['result'][0]['new_id']
+    if newImageQuery["code"] == 280:
+        return newImageQuery["result"][0]["new_id"]
     return "Could not generate new image UID", 500
+
 
 def get_new_deckUID(conn):
     # print("getting new image")
-    newImageQuery = execute("CALL captions.new_deck_uid()", 'get', conn)
+    newImageQuery = execute("CALL captions.new_deck_uid()", "get", conn)
     # print(newImageQuery)
-    if newImageQuery['code'] == 280:
-        return newImageQuery['result'][0]['new_id']
+    if newImageQuery["code"] == 280:
+        return newImageQuery["result"][0]["new_id"]
     return "Could not generate new deck UID", 500
 
 
@@ -489,7 +533,7 @@ def sendEmail(name, email, code, subject):
     # print("In sendEmail")
     with app.app_context():
         # print("In sendEmail: ", email, code, subject)
-        sender="support@capshnz.com"
+        sender = "support@capshnz.com"
         # print("sender: ", sender)
         # print("code: ", code)
 
@@ -499,7 +543,7 @@ def sendEmail(name, email, code, subject):
             f"{code}\n"
             "Have Fun!\n\n"
             "PS: Please send any game feedback to support@capshnz.com"
-            )
+        )
 
         # print("Body: ", message)
 
@@ -507,11 +551,11 @@ def sendEmail(name, email, code, subject):
 
         msg = Message(
             subject=f"Capshnz code: {code}",
-            sender = "support@capshnz.com",
-            recipients = [email],
-            body = message
+            sender="support@capshnz.com",
+            recipients=[email],
+            body=message,
         )
-        
+
         # print("recipients: ", email)
         # print("Email message: ", msg)
         mail.send(msg)
@@ -526,38 +570,33 @@ class SendError(Resource):
         # print("In Send Error get")
         try:
             conn = connect()
-            email = 'pmarathay@gmail.com'
+            email = "pmarathay@gmail.com"
 
             # print("code 1", code1)
             # print("code 2", code2)
-        
+
             # Send email to Client
             msg = Message(
                 "Captions Error Code Generated",
                 # sender="support@nityaayurveda.com",
                 # sender="support@mealsfor.me",
                 sender="support@capshnz.com",
-
-                recipients = ["pmarathay@gmail.com", email]
-                
+                recipients=["pmarathay@gmail.com", email],
             )
             # print("past message")
             # print(msg)
 
             # msg.body = code1
 
-            msg.body = (
-                "Code 1: " + str(code1) + "\n"
-                "Code 2: " + str(code2) + "\n"
-            )
+            msg.body = "Code 1: " + str(code1) + "\n" "Code 2: " + str(code2) + "\n"
 
             # print("past body")
             # print(msg.body)
-            try: 
+            try:
                 # print(msg)
                 mail.send(msg)
                 # print("after mail.send(msg)")
-                
+
             except:
                 print("Likely an EMail Credential Issue")
 
@@ -580,41 +619,62 @@ class addUserByEmail(Resource):
             conn = connect()
             data = request.get_json()
             email = data["user_email"]
-            query = """SELECT * FROM captions.user
-                        WHERE user_email= \'""" + email + """\'
+            query = (
+                """SELECT * FROM captions.user
+                        WHERE user_email= \'"""
+                + email
+                + """\'
                     """
+            )
             user = execute(query, "get", conn)
-            if user['result'] != ():
-                response["user_uid"] = user['result'][0]['user_uid']
+            if user["result"] != ():
+                response["user_uid"] = user["result"][0]["user_uid"]
                 response["user_code"] = user["result"][0]["email_validated"]
                 response["name"] = user["result"][0]["user_name"]
-                response["alias"] =  user["result"][0]["user_alias"]
-                if user['result'][0]["email_validated"] != "TRUE":
+                response["alias"] = user["result"][0]["user_alias"]
+                if user["result"][0]["email_validated"] != "TRUE":
                     response["user_status"] = "User NOT Validated"
-                    
-                    sendEmail( user["result"][0]["user_name"], email, user['result'][0]["email_validated"], "User NOT Validated")
+
+                    sendEmail(
+                        user["result"][0]["user_name"],
+                        email,
+                        user["result"][0]["email_validated"],
+                        "User NOT Validated",
+                    )
             else:
-                code = str(randint(100,999))
+                code = str(randint(100, 999))
                 new_user_uid = get_new_userUID(conn)
                 # print("New User Info: ", new_user_uid, code)
-                query = '''
+                query = (
+                    """
                     INSERT INTO captions.user
-                    SET user_uid = \'''' + new_user_uid + '''\',
-                        user_created_at = \'''' + getNow() + '''\',
-                        user_email = \'''' + email + '''\', 
-                        email_validated = \'''' + code + '''\',
+                    SET user_uid = \'"""
+                    + new_user_uid
+                    + """\',
+                        user_created_at = \'"""
+                    + getNow()
+                    + """\',
+                        user_email = \'"""
+                    + email
+                    + """\', 
+                        email_validated = \'"""
+                    + code
+                    + """\',
                         user_purchases = NULL
-                    '''
+                    """
+                )
                 items = execute(query, "post", conn)
                 if items["code"] == 281:
                     response["message"] = "Create User successful"
                     response["user_uid"] = new_user_uid
                     response["email_validated"] = code
-                    
-                    sendEmail( "", email, code, "User NOT Validated")
+
+                    sendEmail("", email, code, "User NOT Validated")
                 return response, 200
         except Exception as e:
-            raise InternalServerError("An unknown error occurred. If running locally, check email credentials") from e
+            raise InternalServerError(
+                "An unknown error occurred. If running locally, check email credentials"
+            ) from e
         finally:
             disconnect(conn)
         return response, 200
@@ -631,51 +691,67 @@ class addUser(Resource):
             # print("Received:", data)
 
             user_name = data["user_name"]
-            user_alias = data["user_alias"] if data.get("user_alias") is not None else data["user_name"].split[0]
+            user_alias = (
+                data["user_alias"]
+                if data.get("user_alias") is not None
+                else data["user_name"].split[0]
+            )
             user_email = data["user_email"]
             message = "Email Verification Code Sent"
             # user_zip = data["user_zip"]
 
             # print(user_name, user_alias, user_email, message)
-            
 
             # CHECK IF EMAIL EXISTS IN DB
-            check_user = '''SELECT * FROM captions.user
-                            WHERE user_email= \'''' + user_email + '''\'
-                            '''
+            check_user = (
+                """SELECT * FROM captions.user
+                            WHERE user_email= \'"""
+                + user_email
+                + """\'
+                            """
+            )
 
             user = execute(check_user, "get", conn)
             # print("User Info: ", user["result"])
 
-
             # CHECK IF USER EXISTS
-            if user['result'] != ():
+            if user["result"] != ():
                 # print("User Exists")
-            # if len(user['result'][0]['user_uid']) > 0:
-                response["user_uid"] = user['result'][0]['user_uid']
+                # if len(user['result'][0]['user_uid']) > 0:
+                response["user_uid"] = user["result"][0]["user_uid"]
                 response["user_code"] = user["result"][0]["email_validated"]
 
                 # CHECK IF VALIDATION CODE IS TRUE
-                if user['result'][0]["email_validated"] != "TRUE":
+                if user["result"][0]["email_validated"] != "TRUE":
                     # print("Not Validated")
-                    
-                    sendEmail( user["result"][0]["user_name"], user_email, user["result"][0]["email_validated"], "User NOT Validated")
+
+                    sendEmail(
+                        user["result"][0]["user_name"],
+                        user_email,
+                        user["result"][0]["email_validated"],
+                        "User NOT Validated",
+                    )
 
                     response["user_status"] = "User NOT Validated"
-                    
+
                     # return response
-            
 
                 # CHECK IF ALIAS HAS CHANGED
-                if user_alias != user['result'][0]['user_alias']:
+                if user_alias != user["result"][0]["user_alias"]:
                     # print("Alias changed")
                     response["user_alias"] = "Alias changed"
 
-                    query = '''
+                    query = (
+                        """
                         UPDATE captions.user
-                        SET user_alias = \'''' + user_alias + '''\'
-                        WHERE user_email = \'''' + user_email + '''\';
-                        '''
+                        SET user_alias = \'"""
+                        + user_alias
+                        + """\'
+                        WHERE user_email = \'"""
+                        + user_email
+                        + """\';
+                        """
+                    )
 
                     update_alias = execute(query, "post", conn)
                     # print("items: ", update_alias)
@@ -683,15 +759,21 @@ class addUser(Resource):
                         response["user_alias"] = "Alias updated"
 
                 # CHECK IF USER NAME HAS CHANGED
-                if user_name != user['result'][0]['user_name']:
+                if user_name != user["result"][0]["user_name"]:
                     # print("Name changed")
                     response["user_name"] = "Name Changed"
 
-                    query = '''
+                    query = (
+                        """
                         UPDATE captions.user
-                        SET user_name = \'''' + user_name + '''\'
-                        WHERE user_email = \'''' + user_email + '''\';
-                        '''
+                        SET user_name = \'"""
+                        + user_name
+                        + """\'
+                        WHERE user_email = \'"""
+                        + user_email
+                        + """\';
+                        """
+                    )
                     # print("uncomment execute command here")
                     update_name = execute(query, "post", conn)
                     # print("items: ", update_name)
@@ -701,23 +783,37 @@ class addUser(Resource):
             # USER DOES NOT EXIST
             else:
                 # Create Validation Code FOR NEW USER
-                code = str(randint(100,999))
+                code = str(randint(100, 999))
                 # print(f"Email validation code {code} will be set to: {user_email}")
 
                 new_user_uid = get_new_userUID(conn)
                 # print(new_user_uid)
                 # print(getNow())
 
-                query = '''
+                query = (
+                    """
                     INSERT INTO captions.user
-                    SET user_uid = \'''' + new_user_uid + '''\',
-                        user_created_at = \'''' + getNow() + '''\',
-                        user_name = \'''' + user_name + '''\', 
-                        user_alias = \'''' + user_alias + '''\', 
-                        user_email = \'''' + user_email + '''\',
-                        email_validated = \'''' + code + '''\',
+                    SET user_uid = \'"""
+                    + new_user_uid
+                    + """\',
+                        user_created_at = \'"""
+                    + getNow()
+                    + """\',
+                        user_name = \'"""
+                    + user_name
+                    + """\', 
+                        user_alias = \'"""
+                    + user_alias
+                    + """\', 
+                        user_email = \'"""
+                    + user_email
+                    + """\',
+                        email_validated = \'"""
+                    + code
+                    + """\',
                         user_purchases = NULL
-                    '''
+                    """
+                )
 
                 items = execute(query, "post", conn)
 
@@ -729,18 +825,16 @@ class addUser(Resource):
 
                     # Send Code to User
                     # print("\nSending Code to New User")
-                    sendEmail( user_name, user_email, code, message)
+                    sendEmail(user_name, user_email, code, message)
 
                 return response, 200
 
-
-
-
             return response, 200
 
-
         except:
-            raise BadRequest("Create User Request failed. If running on local host make sure your have the MAIL_USERNAME and MAIL_PASSWORD")
+            raise BadRequest(
+                "Create User Request failed. If running on local host make sure your have the MAIL_USERNAME and MAIL_PASSWORD"
+            )
         finally:
             disconnect(conn)
 
@@ -768,16 +862,32 @@ class createGame(Resource):
             game_code = random.randint(10000000, 99999999)
             # print(game_code)
 
-            query = '''
+            query = (
+                """
                 INSERT INTO captions.game
-                SET game_uid = \'''' + new_game_uid + '''\',
-                    game_created_at = \'''' + getNow() + '''\',
-                    game_code = \'''' + str(game_code) + '''\',
-                    num_rounds = \'''' + num_rounds + '''\',
-                    time_limit = \'''' + time_limit + '''\',
-                    game_host_uid = \'''' + user_uid + '''\',
-                    scoring_scheme = \'''' + scoring + '''\'
-                '''
+                SET game_uid = \'"""
+                + new_game_uid
+                + """\',
+                    game_created_at = \'"""
+                + getNow()
+                + """\',
+                    game_code = \'"""
+                + str(game_code)
+                + """\',
+                    num_rounds = \'"""
+                + num_rounds
+                + """\',
+                    time_limit = \'"""
+                + time_limit
+                + """\',
+                    game_host_uid = \'"""
+                + user_uid
+                + """\',
+                    scoring_scheme = \'"""
+                + scoring
+                + """\'
+                """
+            )
 
             items = execute(query, "post", conn)
             # print("items: ", items)
@@ -810,10 +920,14 @@ class joinGame(Resource):
             game_code = data["game_code"]
 
             # Check if game code exists and get game_uid
-            check_game_code_query = '''
+            check_game_code_query = (
+                """
                                     SELECT * FROM captions.game
-                                    WHERE game_code=\'''' + game_code + '''\'
-                                    '''
+                                    WHERE game_code=\'"""
+                + game_code
+                + """\'
+                                    """
+            )
             game_info = execute(check_game_code_query, "get", conn)
             # print(game_info)
             if game_info["code"] == 280 and len(game_info["result"]) == 1:
@@ -824,38 +938,51 @@ class joinGame(Resource):
                 response["round_duration"] = game_info["result"][0]["time_limit"]
                 # print(game_info["result"][0]["time_limit"])
 
-
                 # Check if user is already in the game
-                check_user_in_game_query = '''
+                check_user_in_game_query = (
+                    """
                                             SELECT round_user_uid FROM captions.round
-                                            WHERE round_game_uid = \'''' + game_uid + '''\'
-                                            AND round_user_uid = \'''' + user_uid + '''\';
-                                            '''
+                                            WHERE round_game_uid = \'"""
+                    + game_uid
+                    + """\'
+                                            AND round_user_uid = \'"""
+                    + user_uid
+                    + """\';
+                                            """
+                )
 
                 existing_player = execute(check_user_in_game_query, "get", conn)
                 # print("player_info: ", existing_player)
-                
+
                 if existing_player["code"] == 280 and existing_player["result"] != ():
-                        response["message"] = "280, Player has already joined the game."
-                        response["user_uid"] = user_uid
-                        return response, 409
+                    response["message"] = "280, Player has already joined the game."
+                    response["user_uid"] = user_uid
+                    return response, 409
 
                 else:
                     # User has entered and existing game code and is not in the game
                     # print("in else clause")
                     new_round_uid = get_new_roundUID(conn)
-                    add_user_to_round_query = '''
+                    add_user_to_round_query = (
+                        """
                                             INSERT INTO captions.round
-                                            SET round_uid = \'''' + new_round_uid + '''\',
-                                            round_game_uid = \'''' + game_uid + '''\',
-                                            round_user_uid = \'''' + user_uid + '''\',
+                                            SET round_uid = \'"""
+                        + new_round_uid
+                        + """\',
+                                            round_game_uid = \'"""
+                        + game_uid
+                        + """\',
+                                            round_user_uid = \'"""
+                        + user_uid
+                        + """\',
                                             round_number = 1,
                                             round_deck_uid = NULL,
                                             round_image_uid = NULL ,
                                             caption = NULL,
                                             votes = 0,
                                             score = 0,
-                                            round_started_at = NULL'''
+                                            round_started_at = NULL"""
+                    )
 
                     add_user = execute(add_user_to_round_query, "post", conn)
                     # print("add_user_response: ", add_user)
@@ -868,7 +995,6 @@ class joinGame(Resource):
             else:
                 response["warning"] = "Invalid game code."
                 return response
-
 
         except:
             raise BadRequest("Join Game Request failed")
@@ -889,11 +1015,17 @@ class selectDeck(Resource):
             deck_uid = data["deck_uid"]
             game_code = data["game_code"]
 
-            select_deck_query = '''
+            select_deck_query = (
+                """
                                 UPDATE captions.game
-                                SET game_deck = \'''' + deck_uid + '''\'
-                                WHERE game_code = \'''' + game_code + '''\';
-                                '''
+                                SET game_deck = \'"""
+                + deck_uid
+                + """\'
+                                WHERE game_code = \'"""
+                + game_code
+                + """\';
+                                """
+            )
 
             selected_deck = execute(select_deck_query, "post", conn)
             # print("selected deck info: ", selected_deck)
@@ -1024,6 +1156,8 @@ class uploadDeviceImage(Resource):
             return {"message": f"Upload failed: {str(e)}"}, 500
         finally:
             disconnect(conn)
+
+
 class assignDeck(Resource):
     def post(self):
         response = {}
@@ -1125,15 +1259,14 @@ class decks(Resource):
             # data = request.get_json(force=True)
             # print("Received: ", data)
             #
-            #user_uid = data["user_uid"] #public => "" or personal => "xxx-xxxxxx"
+            # user_uid = data["user_uid"] #public => "" or personal => "xxx-xxxxxx"
 
-            #we need to know user_uid
-                #if it matches or anything that is public (user_uid is provided, match it with that or
+            # we need to know user_uid
+            # if it matches or anything that is public (user_uid is provided, match it with that or
 
-
-            get_all_decks_query = '''
+            get_all_decks_query = """
                                 SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description FROM captions.deck
-                                '''
+                                """
 
             get_all_decks_query1 = '''
                                 SELECT deck_uid, deck_title, deck_thumbnail_url, deck_description
@@ -1156,8 +1289,20 @@ class decks(Resource):
             #decks = execute(get_all_decks_query2, "get", conn)
             # print("players info: ", decks)
             if decks["code"] == 280:
+                # Add "Select from device" option to the deck list
+                device_deck = {
+                    "deck_uid": "device_deck",
+                    "deck_title": "Select from device",
+                    "deck_thumbnail_url": "https://img.icons8.com/fluency/96/upload-to-cloud.png",
+                    "deck_description": "Select photos from your device",
+                    "user_uid": "SYSTEM",
+                }
+
+                # Add device deck at the beginning of the list
+                decks_list = [device_deck] + decks["result"]
+
                 response["message"] = "280, get available decks request successful."
-                response["decks_info"] = decks["result"]
+                response["decks_info"] = decks_list
 
                 return response, 200
         except:
@@ -1176,14 +1321,20 @@ class gameTimer(Resource):
             # round_start_time = 0
             # round_duration = 0
             current_time = getNow()
-            get_game_timer_info = '''
+            get_game_timer_info = (
+                """
                                 SELECT captions.round.round_started_at, captions.game.time_limit, captions.game.num_rounds
                                 FROM captions.round
                                 JOIN captions.game
                                 ON captions.round.round_game_uid = captions.game.game_uid
-                                WHERE captions.game.game_code = \'''' + game_code + '''\'
-                                AND round_number=\'''' + round_number + '''\'
-                                '''
+                                WHERE captions.game.game_code = \'"""
+                + game_code
+                + """\'
+                                AND round_number=\'"""
+                + round_number
+                + """\'
+                                """
+            )
             timer = execute(get_game_timer_info, "get", conn)
 
             # print("timer info: ", timer)
@@ -1215,15 +1366,25 @@ class changeRoundsAndDuration(Resource):
             num_rounds = data["number_of_rounds"]
             seconds = data["round_duration"]
             scoring_scheme = data["scoring_scheme"]
-            round_duration = time.strftime('%H:%M:%S', time.gmtime(int(seconds)))
+            round_duration = time.strftime("%H:%M:%S", time.gmtime(int(seconds)))
 
-            change_rounds_and_duration_query = '''
+            change_rounds_and_duration_query = (
+                """
                                 UPDATE captions.game 
-                                SET num_rounds=\'''' + num_rounds + '''\',
-                                time_limit=\'''' + round_duration + '''\',
-                                scoring_scheme = \'''' + scoring_scheme + '''\'
-                                WHERE game_code=\'''' + game_code + '''\'
-                                '''
+                                SET num_rounds=\'"""
+                + num_rounds
+                + """\',
+                                time_limit=\'"""
+                + round_duration
+                + """\',
+                                scoring_scheme = \'"""
+                + scoring_scheme
+                + """\'
+                                WHERE game_code=\'"""
+                + game_code
+                + """\'
+                                """
+            )
             update_game_attr = execute(change_rounds_and_duration_query, "post", conn)
             # print("game_attr_update info: ", update_game_attr)
             if update_game_attr["code"] == 281:
@@ -1244,13 +1405,21 @@ class startPlaying(Resource):
             conn = connect()
             current_time = getNow()
 
-            start_round_query = '''
+            start_round_query = (
+                """
                                 UPDATE captions.round
-                                SET round_started_at=\'''' + current_time + '''\'
+                                SET round_started_at=\'"""
+                + current_time
+                + """\'
                                 WHERE round_game_uid = (SELECT game_uid FROM captions.game 
-                                WHERE game_code=\'''' + game_code + '''\')
-                                AND round_number=\'''' + round_number + '''\'
-                                '''
+                                WHERE game_code=\'"""
+                + game_code
+                + """\')
+                                AND round_number=\'"""
+                + round_number
+                + """\'
+                                """
+            )
             round_timestamp = execute(start_round_query, "post", conn)
             # print("round_timestamp_result: ", round_timestamp)
             if round_timestamp["code"] == 281:
@@ -1276,33 +1445,39 @@ class getUniqueImageInRound(Resource):
             # check_deck_harvard_query = '''
             #                     SELECT deck_title
             #                     FROM captions.deck
-            #                     WHERE deck_uid = 
+            #                     WHERE deck_uid =
             #                         (SELECT DISTINCT round_deck_uid FROM captions.round WHERE round_game_uid = (
             #                             SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))'''
 
             # print("Check if Harvard Deck")
-            check_deck_harvard_query = '''
+            check_deck_harvard_query = (
+                """
                                 SELECT deck_title
                                 FROM captions.deck
                                 WHERE deck_uid = (
                                         SELECT game_deck 
                                         FROM captions.game 
-                                        WHERE game_code = \'''' + game_code + '''\');'''
+                                        WHERE game_code = \'"""
+                + game_code
+                + """\');"""
+            )
 
             deck_is_harvard = execute(check_deck_harvard_query, "get", conn)
 
-            
-
-            if(deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
+            if deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum":
                 # print("User selected Harvard Deck")
-                get_images_query = '''
+                get_images_query = (
+                    """
                                             SELECT distinct captions.round.round_image_uid
                                             FROM captions.round
                                             INNER Join captions.deck
                                             ON captions.round.round_deck_uid=captions.deck.deck_uid
                                             WHERE round_game_uid =  (SELECT game_uid FROM captions.game
-                                            WHERE game_code=\'''' + game_code + '''\')
-                                            '''
+                                            WHERE game_code=\'"""
+                    + game_code
+                    + """\')
+                                            """
+                )
                 image_info = execute(get_images_query, "get", conn)
                 # print("harvard image info: ", image_info)
 
@@ -1314,12 +1489,14 @@ class getUniqueImageInRound(Resource):
                 flag = True
                 image_id = ""
                 while flag:
-                    image_uid = randint(1,376513)
+                    image_uid = randint(1, 376513)
                     page = image_uid // 10 + 1
                     index = image_uid % 10
 
-                    harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page=" + str(
-                        page)
+                    harvardURL = (
+                        "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page="
+                        + str(page)
+                    )
                     # print(harvardURL)
                     r = requests.get(harvardURL)
                     # print(index)
@@ -1334,42 +1511,53 @@ class getUniqueImageInRound(Resource):
 
                 # print("next_image_id: ", image_id, type(image_id))
 
-                write_to_round_query = '''
+                write_to_round_query = (
+                    """
                                                         UPDATE captions.round
-                                                        SET round_image_uid=\'''' + image_id + '''\'
+                                                        SET round_image_uid=\'"""
+                    + image_id
+                    + """\'
                                                         WHERE round_game_uid=(SELECT game_uid FROM captions.game
-                                                        WHERE game_code=\'''' + game_code + '''\')
-                                                        AND round_number = \'''' + round_number + '''\'
-                                                        '''
+                                                        WHERE game_code=\'"""
+                    + game_code
+                    + """\')
+                                                        AND round_number = \'"""
+                    + round_number
+                    + """\'
+                                                        """
+                )
                 updated_round = execute(write_to_round_query, "post", conn)
                 # print("game_attr_update info: ", updated_round)
 
                 if updated_round["code"] == 281:
                     response["message"] = "281, image in the Round updated."
-                    #print("Return url for getUniqueImageInRound ", r.json()["records"][index]["baseimageurl"])
+                    # print("Return url for getUniqueImageInRound ", r.json()["records"][index]["baseimageurl"])
                     response["image_url"] = r.json()["records"][index]["baseimageurl"]
                     response["image_uid"] = image_uid
                     return response, 200
 
-               # return //the end
+            # return //the end
 
-
-            #maintain a set of already used integers and choose integers as we need
+            # maintain a set of already used integers and choose integers as we need
             # if it is already
 
-            #Below is the code for the non-harvard api decks(do not touch)  >:(
+            # Below is the code for the non-harvard api decks(do not touch)  >:(
             ################################################################################
             # print("User selected deck other than Harvard")
 
             # RETURN ALL IMAGES ASSOCIATED WITH A DATABASE DECK
-            get_images_query = '''
+            get_images_query = (
+                """
                             SELECT distinct(captions.deck.deck_image_uids), captions.round.round_image_uid
                             FROM captions.round
                             INNER Join captions.deck
                             ON captions.round.round_deck_uid=captions.deck.deck_uid
                             WHERE round_game_uid =  (SELECT game_uid FROM captions.game 
-                            WHERE game_code=\'''' + game_code + '''\')                                
-                            '''
+                            WHERE game_code=\'"""
+                + game_code
+                + """\')                                
+                            """
+            )
             image_info = execute(get_images_query, "get", conn)
 
             # print("\nimage info: ", image_info)
@@ -1377,7 +1565,9 @@ class getUniqueImageInRound(Resource):
             # print("\nround image: ", image_info["result"][0]["round_image_uid"])
 
             if image_info["code"] == 280:
-                images_in_deck_str = image_info["result"][0]["deck_image_uids"][2:-2]#.split(', ')
+                images_in_deck_str = image_info["result"][0]["deck_image_uids"][
+                    2:-2
+                ]  # .split(', ')
                 images_in_deck_str = images_in_deck_str.replace('"', " ")
                 images_in_deck = images_in_deck_str.split(" ,  ")
                 # print("\nImages in deck: ", images_in_deck)
@@ -1391,7 +1581,7 @@ class getUniqueImageInRound(Resource):
                 flag = True
                 image_uid = ""
                 while flag:
-                    index = random.randint(0, len(images_in_deck)-1)
+                    index = random.randint(0, len(images_in_deck) - 1)
                     # print("curr index: ", index)
                     if images_in_deck[index] not in images_used:
                         image_uid = images_in_deck[index]
@@ -1400,21 +1590,33 @@ class getUniqueImageInRound(Resource):
                 # print("next_image_uid: ", image_uid, type(image_uid))
 
                 response["message1"] = "280, get image request successful."
-                get_image_url_query = '''
+                get_image_url_query = (
+                    """
                                     SELECT image_url FROM captions.image
-                                    WHERE image_uid=\'''' + image_uid + '''\'
-                                    '''
+                                    WHERE image_uid=\'"""
+                    + image_uid
+                    + """\'
+                                    """
+                )
                 image_url = execute(get_image_url_query, "get", conn)
                 # print("image_url: ", image_url)
                 if image_url["code"] == 280:
-                    #update round image query
-                    write_to_round_query = '''
+                    # update round image query
+                    write_to_round_query = (
+                        """
                                         UPDATE captions.round
-                                        SET round_image_uid=\'''' + image_uid + '''\'
+                                        SET round_image_uid=\'"""
+                        + image_uid
+                        + """\'
                                         WHERE round_game_uid=(SELECT game_uid FROM captions.game
-                                        WHERE game_code=\'''' + game_code + '''\')
-                                        AND round_number = \'''' + round_number + '''\'
-                                        '''
+                                        WHERE game_code=\'"""
+                        + game_code
+                        + """\')
+                                        AND round_number = \'"""
+                        + round_number
+                        + """\'
+                                        """
+                    )
                     updated_round = execute(write_to_round_query, "post", conn)
                     # print("game_attr_update info: ", updated_round)
                     if updated_round["code"] == 281:
@@ -1438,26 +1640,34 @@ class getImageForPlayers(Resource):
             conn = connect()
 
             #####  HARVARD ART MUSEUM IF CLAUSE #####
-            check_deck_harvard_query = '''
+            check_deck_harvard_query = (
+                """
                                 SELECT deck_title
                                 FROM captions.deck
                                 WHERE deck_uid = 
                                     (SELECT DISTINCT round_deck_uid FROM captions.round WHERE round_game_uid = (
-                                        SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))'''
+                                        SELECT game_uid FROM captions.game WHERE game_code =\'"""
+                + game_code
+                + """\'))"""
+            )
             deck_is_harvard = execute(check_deck_harvard_query, "get", conn)
 
-            
-
-            if(deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum"):
+            if deck_is_harvard["result"][0]["deck_title"] == "Harvard Art Museum":
                 # print("In getImageForPlayers in Harvard Deck")
-                get_image_query = '''
+                get_image_query = (
+                    """
                                     SELECT DISTINCT captions.round.round_image_uid
                                     FROM captions.round
-                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\')
+                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code =\'"""
+                    + game_code
+                    + """\')
                                     AND round_number = (SELECT MAX(round_number)
                                                         FROM captions.round
-                                                        WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code =\'''' + game_code + '''\'))
-                                    '''
+                                                        WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code =\'"""
+                    + game_code
+                    + """\'))
+                                    """
+                )
 
                 image_info = execute(get_image_query, "get", conn)
                 image_uid = image_info["result"][0]["round_image_uid"]
@@ -1465,43 +1675,56 @@ class getImageForPlayers(Resource):
                 # page = image_uid//10 + 1
                 # index = image_uid%10
 
-                harvardURL = "https://api.harvardartmuseums.org/image/"+ image_uid +"?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633"
-                #harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page="
+                harvardURL = (
+                    "https://api.harvardartmuseums.org/image/"
+                    + image_uid
+                    + "?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633"
+                )
+                # harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page="
                 # print(harvardURL)
-                #print(index)
+                # print(index)
                 r = requests.get(harvardURL)
-                #print("before return getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
-
+                # print("before return getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
 
                 # print("image info: ", image_info)
                 if image_info["code"] == 280:
-                    response["message"] = "280, get image for players other than host request successful."
+                    response["message"] = (
+                        "280, get image for players other than host request successful."
+                    )
                     response["image_id"] = image_uid
-                    #response["image_uid"] = image_info["result"][0]["round_image_uid"]
-                    #response["image_url"] = image_info["result"][0]["image_url"]
-                    #print("Return url for getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
-                    #response["image_url"] = r.json()["records"][index]["baseimageurl"]
+                    # response["image_uid"] = image_info["result"][0]["round_image_uid"]
+                    # response["image_url"] = image_info["result"][0]["image_url"]
+                    # print("Return url for getImageForPlayers ", r.json()["records"][index]["baseimageurl"])
+                    # response["image_url"] = r.json()["records"][index]["baseimageurl"]
                     response["image_url"] = r.json()["baseimageurl"]
                     return response, 200
 
             ####  Non-HARVARD #####
 
-            get_image_query = '''
+            get_image_query = (
+                """
                             SELECT DISTINCT captions.image.image_url, captions.round.round_image_uid
                             FROM captions.image
                             INNER JOIN captions.round
                             ON captions.image.image_uid = captions.round.round_image_uid
-                            WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
+                            WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'"""
+                + game_code
+                + """\')
                             AND round_number=(SELECT MAX(round_number) 
                                             FROM captions.round 
-                                            WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\'))             
-                            '''
+                                            WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'"""
+                + game_code
+                + """\'))             
+                            """
+            )
             # print("In getImageForPlayers Non Harvard Deck")
             image_info = execute(get_image_query, "get", conn)
 
             # print("image info: ", image_info)
             if image_info["code"] == 280:
-                response["message"] = "280, get image for players other than host request successful."
+                response["message"] = (
+                    "280, get image for players other than host request successful."
+                )
                 response["image_uid"] = image_info["result"][0]["round_image_uid"]
                 response["image_url"] = image_info["result"][0]["image_url"]
                 return response, 200
@@ -1518,7 +1741,7 @@ class getRoundImage(Resource):
         items = {}
         try:
             conn = connect()
-            
+
             # print to Received data to Terminal
 
             # Tried to pass JSON object into GET.  Worked in LOCAL HOST but not live.
@@ -1531,14 +1754,20 @@ class getRoundImage(Resource):
 
             if round_number != "0":
 
-                images_used_in_round = '''
+                images_used_in_round = (
+                    """
                                     SELECT round_image_uid,
                                         COUNT(round_image_uid) AS num_occurances
                                     FROM captions.round
-                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
-                                        AND round_number=\'''' + round_number + '''\'
+                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'"""
+                    + game_code
+                    + """\')
+                                        AND round_number=\'"""
+                    + round_number
+                    + """\'
                                     GROUP BY round_image_uid;
-                                    '''
+                                    """
+                )
                 images = execute(images_used_in_round, "get", conn)
                 # print("caption info: ", images["result"])
                 if images["code"] == 280:
@@ -1546,14 +1775,18 @@ class getRoundImage(Resource):
                     response["message"] = "280, Found Images used in Round."
                     return response, 200
             else:
-                images_used_in_round = '''
+                images_used_in_round = (
+                    """
                                     SELECT round_number,
                                         round_image_uid,
                                         COUNT(*) AS num_occurances
                                     FROM captions.round
-                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'''' + game_code + '''\')
+                                    WHERE round_game_uid = (SELECT game_uid FROM captions.game WHERE game_code=\'"""
+                    + game_code
+                    + """\')
                                     GROUP BY round_image_uid, round_number;
-                                    '''
+                                    """
+                )
                 images = execute(images_used_in_round, "get", conn)
                 # print("caption info: ", images["result"])
                 if images["code"] == 280:
@@ -1581,13 +1814,21 @@ class postRoundImage(Resource):
             image_uid = data["image"]
             # print(round_number)
 
-            write_to_round_query = '''
+            write_to_round_query = (
+                """
                                     UPDATE captions.round
-                                    SET round_image_uid=\'''' + image_uid + '''\'
+                                    SET round_image_uid=\'"""
+                + image_uid
+                + """\'
                                     WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                    WHERE game_code=\'''' + game_code + '''\')
-                                    AND round_number = \'''' + round_number + '''\'
-                                    '''
+                                    WHERE game_code=\'"""
+                + game_code
+                + """\')
+                                    AND round_number = \'"""
+                + round_number
+                + """\'
+                                    """
+            )
             updated_round = execute(write_to_round_query, "post", conn)
             # print("Image info written to db: ", updated_round)
             if updated_round["code"] == 281:
@@ -1614,30 +1855,48 @@ class submitCaption(Resource):
             game_code = data["game_code"]
             user_uid = data["user_uid"]
 
-            submit_caption_query = '''
+            submit_caption_query = (
+                """
                                 UPDATE captions.round 
-                                SET caption=\'''' + caption + '''\' 
+                                SET caption=\'"""
+                + caption
+                + """\' 
                                 WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                WHERE game_code=\'''' + game_code + '''\') 
-                                AND round_number=\'''' + round_number + '''\'
-                                AND round_user_uid=\'''' + user_uid + '''\' 
-                                '''
+                                WHERE game_code=\'"""
+                + game_code
+                + """\') 
+                                AND round_number=\'"""
+                + round_number
+                + """\'
+                                AND round_user_uid=\'"""
+                + user_uid
+                + """\' 
+                                """
+            )
             caption = execute(submit_caption_query, "post", conn)
             # print("caption info: ", caption)
             if caption["code"] == 281:
                 response["message"] = "281, Caption for the user updated."
 
-                no_caption_submitted_query = '''
+                no_caption_submitted_query = (
+                    """
                                             SELECT count(round_user_uid) AS NoCaptionSubmitted
                                             FROM captions.round
                                             WHERE round_game_uid = (SELECT game_uid FROM captions.game 
-                                                                    WHERE game_code = \'''' + game_code + '''\') AND
-                                                round_number = \'''' + round_number + '''\' AND
+                                                                    WHERE game_code = \'"""
+                    + game_code
+                    + """\') AND
+                                                round_number = \'"""
+                    + round_number
+                    + """\' AND
                                                 caption IS NULL
-                                            '''
+                                            """
+                )
                 no_caption = execute(no_caption_submitted_query, "get", conn)
                 # print("no caption info: ", no_caption["result"][0]["NoCaptionSubmitted"])
-                response["no_caption_submitted"] = no_caption["result"][0]["NoCaptionSubmitted"]
+                response["no_caption_submitted"] = no_caption["result"][0][
+                    "NoCaptionSubmitted"
+                ]
 
                 return response, 200
         except:
@@ -1654,25 +1913,35 @@ class getPlayersRemainingToSubmitCaption(Resource):
         items = {}
         try:
             conn = connect()
-            get_players_query = '''
+            get_players_query = (
+                """
                             SELECT captions.round.round_user_uid, captions.user.user_alias
                             FROM captions.round
                             INNER JOIN captions.user 
                             ON captions.round.round_user_uid=captions.user.user_uid
                             WHERE round_game_uid = (SELECT game_uid FROM captions.game 
-                            WHERE game_code=\'''' + game_code + '''\')
-                            AND round_number=\'''' + round_number + '''\'
+                            WHERE game_code=\'"""
+                + game_code
+                + """\')
+                            AND round_number=\'"""
+                + round_number
+                + """\'
                             AND caption IS NULL                         
-                            '''
+                            """
+            )
             players_info = execute(get_players_query, "get", conn)
 
             # print("players info: ", players_info)
             if players_info["code"] == 280:
-                response["message1"] = "280, get players yet to submit captions request successful."
+                response["message1"] = (
+                    "280, get players yet to submit captions request successful."
+                )
                 response["players"] = players_info["result"]
                 return response, 200
         except:
-            raise BadRequest("Get players who haven't submitted captions request failed")
+            raise BadRequest(
+                "Get players who haven't submitted captions request failed"
+            )
         finally:
             disconnect(conn)
 
@@ -1685,18 +1954,26 @@ class getAllSubmittedCaptions(Resource):
         items = {}
         try:
             conn = connect()
-            get_captions_query = '''
+            get_captions_query = (
+                """
                             SELECT round_user_uid, caption FROM captions.round
                             WHERE round_game_uid = (SELECT game_uid FROM captions.game 
-                            WHERE game_code=\'''' + game_code + '''\')
-                            AND round_number=\'''' + round_number + '''\'
+                            WHERE game_code=\'"""
+                + game_code
+                + """\')
+                            AND round_number=\'"""
+                + round_number
+                + """\'
                             AND caption IS NOT NULL                         
-                            '''
+                            """
+            )
             captions = execute(get_captions_query, "get", conn)
 
             # print("players info: ", captions)
             if captions["code"] == 280:
-                response["message1"] = "280, get players who submitted captions request successful."
+                response["message1"] = (
+                    "280, get players who submitted captions request successful."
+                )
                 response["players"] = captions["result"]
                 return response, 200
         except:
@@ -1726,14 +2003,22 @@ class voteCaption(Resource):
                 response["message"] = "No Vote Cast."
 
                 # Need to add NoVotes quote
-                submit_novote_query = '''
+                submit_novote_query = (
+                    """
                                 UPDATE captions.round
                                 SET novotes = 1 
                                 WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                WHERE game_code=\'''' + game_code + '''\')
-                                AND round_number=\'''' + round_number + '''\'
-                                AND round_user_uid=\'''' + user_id + '''\'                                  
-                                '''
+                                WHERE game_code=\'"""
+                    + game_code
+                    + """\')
+                                AND round_number=\'"""
+                    + round_number
+                    + """\'
+                                AND round_user_uid=\'"""
+                    + user_id
+                    + """\'                                  
+                                """
+                )
                 novote = execute(submit_novote_query, "post", conn)
                 # print("no vote info: ", novote)
                 if novote["code"] == 281:
@@ -1741,41 +2026,55 @@ class voteCaption(Resource):
                     # return response, 200
 
             else:
-                submit_caption_query = '''
+                submit_caption_query = (
+                    """
                                 UPDATE captions.round
                                 SET votes = votes + 1 
                                 WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                WHERE game_code=\'''' + game_code + '''\')
-                                AND round_number=\'''' + round_number + '''\'
-                                AND caption=\'''' + caption + '''\'                                  
-                                '''
+                                WHERE game_code=\'"""
+                    + game_code
+                    + """\')
+                                AND round_number=\'"""
+                    + round_number
+                    + """\'
+                                AND caption=\'"""
+                    + caption
+                    + """\'                                  
+                                """
+                )
                 caption = execute(submit_caption_query, "post", conn)
                 # print("caption info: ", caption)
                 if caption["code"] == 281:
                     response["message"] = "281, Vote Recorded."
                     # return response, 200
 
-            get_players_count_query = '''
+            get_players_count_query = (
+                """
                             SELECT 
                                 IF(COUNT(votes)-SUM(votes)-SUM(novotes) < 0,0, COUNT(votes)-SUM(votes)-SUM(novotes)) AS notvoted FROM captions.round
                             INNER JOIN captions.user
                             ON captions.round.round_user_uid=captions.user.user_uid
                             WHERE round_game_uid = (SELECT game_uid FROM captions.game
-                            WHERE game_code=\'''' + game_code + '''\')
-                            AND round_number=\'''' + round_number + '''\'
-                            '''
+                            WHERE game_code=\'"""
+                + game_code
+                + """\')
+                            AND round_number=\'"""
+                + round_number
+                + """\'
+                            """
+            )
             players_count = execute(get_players_count_query, "get", conn)
 
             # print("players info: ", players_count)
             # print("players info code: ", players_count["code"])
             if players_count["code"] == 280:
 
-                response["message1"] = "280, get players who haven't submitted votes request successful."
+                response["message1"] = (
+                    "280, get players who haven't submitted votes request successful."
+                )
                 response["players_count"] = players_count["result"][0]["notvoted"]
                 return response, 200
 
-
-                    
         except:
             raise BadRequest("Voting failed")
         finally:
@@ -1790,22 +2089,30 @@ class getPlayersWhoHaventVoted(Resource):
         items = {}
         try:
             conn = connect()
-            get_players_count_query = '''
+            get_players_count_query = (
+                """
                             SELECT 
                                 IF(COUNT(votes)-SUM(votes)-SUM(novotes) < 0,0, COUNT(votes)-SUM(votes)-SUM(novotes)) AS notvoted FROM captions.round
                             INNER JOIN captions.user
                             ON captions.round.round_user_uid=captions.user.user_uid
                             WHERE round_game_uid = (SELECT game_uid FROM captions.game
-                            WHERE game_code=\'''' + game_code + '''\')
-                            AND round_number=\'''' + round_number + '''\'
-                            '''
+                            WHERE game_code=\'"""
+                + game_code
+                + """\')
+                            AND round_number=\'"""
+                + round_number
+                + """\'
+                            """
+            )
             players_count = execute(get_players_count_query, "get", conn)
 
             # print("players info: ", players_count)
             # print("players info code: ", players_count["code"])
             if players_count["code"] == 280:
 
-                response["message1"] = "280, get players who haven't submitted votes request successful."
+                response["message1"] = (
+                    "280, get players who haven't submitted votes request successful."
+                )
                 response["players_count"] = players_count["result"][0]["notvoted"]
                 return response, 200
         except:
@@ -1850,35 +2157,51 @@ class getScores(Resource):
         try:
             print("In Try")
             conn = connect()
-            get_game_score = '''
+            get_game_score = (
+                """
                             SELECT round_user_uid, SUM(score) as game_score FROM captions.round
                             WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                WHERE game_code=\'''' + game_code + '''\')
+                                WHERE game_code=\'"""
+                + game_code
+                + """\')
                             GROUP BY round_user_uid
-                            '''
+                            """
+            )
             game_score = execute(get_game_score, "get", conn)
             print("game_score_info:", game_score)
             if game_score["code"] == 280:
-                get_score_query = '''
+                get_score_query = (
+                    """
                                 SELECT captions.round.round_user_uid, captions.user.user_alias,
                                 captions.round.caption, captions.round.votes, captions.round.score, captions.round.round_image_uid
                                 FROM captions.round
                                 INNER JOIN captions.user
                                 ON captions.round.round_user_uid=captions.user.user_uid
                                 WHERE round_game_uid = (SELECT game_uid FROM captions.game
-                                WHERE game_code=\'''' + game_code + '''\')
-                                AND round_number=\'''' + round_number + '''\'
-                                '''
+                                WHERE game_code=\'"""
+                    + game_code
+                    + """\')
+                                AND round_number=\'"""
+                    + round_number
+                    + """\'
+                                """
+                )
                 scoreboard = execute(get_score_query, "get", conn)
                 print("score info: ", scoreboard)
                 if scoreboard["code"] == 280:
-                    response["message"] = "280, scoreboard is updated and get_score_board request " \
-                                          "successful."
+                    response["message"] = (
+                        "280, scoreboard is updated and get_score_board request "
+                        "successful."
+                    )
                     index = 0
-                    for game_info, round_info in zip(game_score["result"], scoreboard["result"]):
+                    for game_info, round_info in zip(
+                        game_score["result"], scoreboard["result"]
+                    ):
                         # print("game_score:", game_info)
                         # print("round_info:", round_info)
-                        scoreboard["result"][index]["game_score"] = game_info["game_score"]
+                        scoreboard["result"][index]["game_score"] = game_info[
+                            "game_score"
+                        ]
                         index += 1
                     response["scoreboard"] = scoreboard["result"]
                     return response, 200
@@ -1900,105 +2223,159 @@ class getScoreBoard(Resource):
             conn = connect()
 
             # INCORPORATING updateScores ENDPOINT
-            get_scoring = '''
+            get_scoring = (
+                """
                             SELECT scoring_scheme FROM captions.game
-                            WHERE game_code=\'''' + game_code + '''\'
-                            '''
+                            WHERE game_code=\'"""
+                + game_code
+                + """\'
+                            """
+            )
             scoring_info = execute(get_scoring, "get", conn)
             # print("scoring info: ", scoring_info)
             if scoring_info["code"] == 280:
                 scoring = scoring_info["result"][0]["scoring_scheme"]
                 # print(scoring)
-                if scoring == "R" or scoring == 'r':
+                if scoring == "R" or scoring == "r":
                     highest_votes = 0
                     second_highest_votes = 0
-                    get_highest_votes = '''
+                    get_highest_votes = (
+                        """
                                         SELECT MAX(votes) FROM captions.round
                                         WHERE round_game_uid = (SELECT game_uid FROM captions.game 
-                                            WHERE game_code=\'''' + game_code + '''\')
-                                        AND round_number=\'''' + round_number + '''\'
-                                        '''
+                                            WHERE game_code=\'"""
+                        + game_code
+                        + """\')
+                                        AND round_number=\'"""
+                        + round_number
+                        + """\'
+                                        """
+                    )
                     winner = execute(get_highest_votes, "get", conn)
                     # print("winner_info:", winner)
                     if winner["code"] == 280:
                         highest_votes = str(winner["result"][0]["MAX(votes)"])
                         # print("highest votes: ", highest_votes, type(highest_votes))
-                        get_second_highest_votes = '''
+                        get_second_highest_votes = (
+                            """
                                                     SELECT votes FROM captions.round 
                                                     WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                                        WHERE game_code=\'''' + game_code + '''\') 
-                                                    AND round_number=\'''' + round_number + '''\'
-                                                    AND votes<\'''' + highest_votes + '''\'
+                                                        WHERE game_code=\'"""
+                            + game_code
+                            + """\') 
+                                                    AND round_number=\'"""
+                            + round_number
+                            + """\'
+                                                    AND votes<\'"""
+                            + highest_votes
+                            + """\'
                                                     ORDER BY votes DESC
-                                                    '''
+                                                    """
+                        )
                         runner_up = execute(get_second_highest_votes, "get", conn)
                         # print("runner-up info:", runner_up)
                         if runner_up["code"] == 280:
-                            second_highest_votes = str(runner_up["result"][0]["votes"]) if runner_up["result"] and \
-                                                                                           runner_up["result"][0][
-                                                                                               "votes"] > 0 else "-1"
+                            second_highest_votes = (
+                                str(runner_up["result"][0]["votes"])
+                                if runner_up["result"]
+                                and runner_up["result"][0]["votes"] > 0
+                                else "-1"
+                            )
                             # print("second highest votes: ", second_highest_votes, type(second_highest_votes))
-                            update_scores_query = '''
+                            update_scores_query = (
+                                """
                                                 UPDATE captions.round	
                                                 SET score = CASE
-                                                    WHEN votes=\'''' + highest_votes + '''\' THEN score+5 
-                                                    WHEN votes=\'''' + second_highest_votes + '''\' THEN score+3
+                                                    WHEN votes=\'"""
+                                + highest_votes
+                                + """\' THEN score+5 
+                                                    WHEN votes=\'"""
+                                + second_highest_votes
+                                + """\' THEN score+3
                                                     ELSE 0
                                                     END
                                                 WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                                    WHERE game_code=\'''' + game_code + '''\')
-                                                AND round_number=\'''' + round_number + '''\'
-                                                '''
+                                                    WHERE game_code=\'"""
+                                + game_code
+                                + """\')
+                                                AND round_number=\'"""
+                                + round_number
+                                + """\'
+                                                """
+                            )
                             update_scores = execute(update_scores_query, "post", conn)
                             if update_scores["code"] == 281:
-                                response["message"] = "281, update scoreboard by ranking request successful."
+                                response["message"] = (
+                                    "281, update scoreboard by ranking request successful."
+                                )
                                 # return response, 200
-                elif scoring == "V" or scoring == 'v':
-                    update_score_by_votes_query = '''
+                elif scoring == "V" or scoring == "v":
+                    update_score_by_votes_query = (
+                        """
                                                     UPDATE captions.round
                                                     SET score = 2 * votes
                                                     WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                                            WHERE game_code=\'''' + game_code + '''\')
-                                                    AND round_number=\'''' + round_number + '''\'
-                                                    '''
+                                                            WHERE game_code=\'"""
+                        + game_code
+                        + """\')
+                                                    AND round_number=\'"""
+                        + round_number
+                        + """\'
+                                                    """
+                    )
                     update_scores = execute(update_score_by_votes_query, "post", conn)
                     # print("update_score_info: ", update_scores)
                     if update_scores["code"] == 281:
-                        response["message"] = "281, update scoreboard by votes request successful."
+                        response["message"] = (
+                            "281, update scoreboard by votes request successful."
+                        )
                         # return response, 200
 
-
-
-
-            get_game_score = '''
+            get_game_score = (
+                """
                             SELECT round_user_uid, SUM(score) as game_score FROM captions.round
                             WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                WHERE game_code=\'''' + game_code + '''\')
+                                WHERE game_code=\'"""
+                + game_code
+                + """\')
                             GROUP BY round_user_uid
-                            '''
+                            """
+            )
             game_score = execute(get_game_score, "get", conn)
             # print("game_score_info:", game_score)
             if game_score["code"] == 280:
-                get_score_query = '''
+                get_score_query = (
+                    """
                                 SELECT captions.round.round_user_uid, captions.user.user_alias,
                                 captions.round.caption, captions.round.votes, captions.round.score, captions.round.round_image_uid
                                 FROM captions.round
                                 INNER JOIN captions.user
                                 ON captions.round.round_user_uid=captions.user.user_uid
                                 WHERE round_game_uid = (SELECT game_uid FROM captions.game
-                                WHERE game_code=\'''' + game_code + '''\')
-                                AND round_number=\'''' + round_number + '''\'
-                                '''
+                                WHERE game_code=\'"""
+                    + game_code
+                    + """\')
+                                AND round_number=\'"""
+                    + round_number
+                    + """\'
+                                """
+                )
                 scoreboard = execute(get_score_query, "get", conn)
                 # print("score info: ", scoreboard)
                 if scoreboard["code"] == 280:
-                    response["message"] = "280, scoreboard is updated and get_score_board request " \
-                                          "successful."
+                    response["message"] = (
+                        "280, scoreboard is updated and get_score_board request "
+                        "successful."
+                    )
                     index = 0
-                    for game_info, round_info in zip(game_score["result"], scoreboard["result"]):
+                    for game_info, round_info in zip(
+                        game_score["result"], scoreboard["result"]
+                    ):
                         # print("game_score:", game_info)
                         # print("round_info:", round_info)
-                        scoreboard["result"][index]["game_score"] = game_info["game_score"]
+                        scoreboard["result"][index]["game_score"] = game_info[
+                            "game_score"
+                        ]
                         index += 1
                     response["scoreboard"] = scoreboard["result"]
                     return response, 200
@@ -2016,71 +2393,112 @@ class updateScores(Resource):
         items = {}
         try:
             conn = connect()
-            get_scoring = '''
+            get_scoring = (
+                """
                             SELECT scoring_scheme FROM captions.game
-                            WHERE game_code=\'''' + game_code + '''\'
-                            '''
+                            WHERE game_code=\'"""
+                + game_code
+                + """\'
+                            """
+            )
             scoring_info = execute(get_scoring, "get", conn)
             # print("scoring info: ", scoring_info)
             if scoring_info["code"] == 280:
                 scoring = scoring_info["result"][0]["scoring_scheme"]
                 # print(scoring)
-                if scoring == "R" or scoring == 'r':
+                if scoring == "R" or scoring == "r":
                     highest_votes = 0
                     second_highest_votes = 0
-                    get_highest_votes = '''
+                    get_highest_votes = (
+                        """
                                         SELECT MAX(votes) FROM captions.round
                                         WHERE round_game_uid = (SELECT game_uid FROM captions.game 
-                                            WHERE game_code=\'''' + game_code + '''\')
-                                        AND round_number=\'''' + round_number + '''\'
-                                        '''
+                                            WHERE game_code=\'"""
+                        + game_code
+                        + """\')
+                                        AND round_number=\'"""
+                        + round_number
+                        + """\'
+                                        """
+                    )
                     winner = execute(get_highest_votes, "get", conn)
                     # print("winner_info:", winner)
                     if winner["code"] == 280:
                         highest_votes = str(winner["result"][0]["MAX(votes)"])
                         # print("highest votes: ", highest_votes, type(highest_votes))
-                        get_second_highest_votes = '''
+                        get_second_highest_votes = (
+                            """
                                                     SELECT votes FROM captions.round 
                                                     WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                                        WHERE game_code=\'''' + game_code + '''\') 
-                                                    AND round_number=\'''' + round_number + '''\'
-                                                    AND votes<\'''' + highest_votes + '''\'
+                                                        WHERE game_code=\'"""
+                            + game_code
+                            + """\') 
+                                                    AND round_number=\'"""
+                            + round_number
+                            + """\'
+                                                    AND votes<\'"""
+                            + highest_votes
+                            + """\'
                                                     ORDER BY votes DESC
-                                                    '''
+                                                    """
+                        )
                         runner_up = execute(get_second_highest_votes, "get", conn)
                         # print("runner-up info:", runner_up)
                         if runner_up["code"] == 280:
-                            second_highest_votes = str(runner_up["result"][0]["votes"]) if runner_up["result"] and \
-                                                                                           runner_up["result"][0][
-                                                                                               "votes"] > 0 else "-1"
+                            second_highest_votes = (
+                                str(runner_up["result"][0]["votes"])
+                                if runner_up["result"]
+                                and runner_up["result"][0]["votes"] > 0
+                                else "-1"
+                            )
                             # print("second highest votes: ", second_highest_votes, type(second_highest_votes))
-                            update_scores_query = '''
+                            update_scores_query = (
+                                """
                                                 UPDATE captions.round	
                                                 SET score = CASE
-                                                    WHEN votes=\'''' + highest_votes + '''\' THEN score+5 
-                                                    WHEN votes=\'''' + second_highest_votes + '''\' THEN score+3
+                                                    WHEN votes=\'"""
+                                + highest_votes
+                                + """\' THEN score+5 
+                                                    WHEN votes=\'"""
+                                + second_highest_votes
+                                + """\' THEN score+3
                                                     ELSE 0
                                                     END
                                                 WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                                    WHERE game_code=\'''' + game_code + '''\')
-                                                AND round_number=\'''' + round_number + '''\'
-                                                '''
+                                                    WHERE game_code=\'"""
+                                + game_code
+                                + """\')
+                                                AND round_number=\'"""
+                                + round_number
+                                + """\'
+                                                """
+                            )
                             update_scores = execute(update_scores_query, "post", conn)
                             if update_scores["code"] == 281:
-                                response["message"] = "281, update scoreboard by ranking request successful."
+                                response["message"] = (
+                                    "281, update scoreboard by ranking request successful."
+                                )
                                 return response, 200
-                elif scoring == "V" or scoring == 'v':
-                    update_score_by_votes_query = '''
+                elif scoring == "V" or scoring == "v":
+                    update_score_by_votes_query = (
+                        """
                                                     UPDATE captions.round
                                                     SET score = 2 * votes
                                                     WHERE round_game_uid=(SELECT game_uid FROM captions.game 
-                                                            WHERE game_code=\'''' + game_code + '''\')
-                                                    AND round_number=\'''' + round_number + '''\'
-                                                    '''
+                                                            WHERE game_code=\'"""
+                        + game_code
+                        + """\')
+                                                    AND round_number=\'"""
+                        + round_number
+                        + """\'
+                                                    """
+                    )
                     update_scores = execute(update_score_by_votes_query, "post", conn)
                     # print("update_score_info: ", update_scores)
                     if update_scores["code"] == 281:
-                        response["message"] = "281, update scoreboard by votes request successful."
+                        response["message"] = (
+                            "281, update scoreboard by votes request successful."
+                        )
                         return response, 200
         except:
             raise BadRequest("update scoreboard request failed")
@@ -2102,12 +2520,18 @@ class createNextRound(Resource):
             new_round_number = str(int(round_number) + 1)
             # print("Next Round Number:", new_round_number)
 
-            players_query = '''
+            players_query = (
+                """
                                 SELECT round_user_uid, round_deck_uid FROM captions.round
                                 WHERE round_game_uid = (SELECT game_uid FROM captions.game 
-                                WHERE game_code=\'''' + game_code + '''\')
-                                AND round_number=\'''' + round_number + '''\'
-                                '''
+                                WHERE game_code=\'"""
+                + game_code
+                + """\')
+                                AND round_number=\'"""
+                + round_number
+                + """\'
+                                """
+            )
             players = execute(players_query, "get", conn)
             # print("players count:", players)
             if players["code"] == 280:
@@ -2117,17 +2541,29 @@ class createNextRound(Resource):
                     new_round_uid = get_new_roundUID(conn)
                     user_uid = players["result"][i]["round_user_uid"]
                     deck_uid = players["result"][i]["round_deck_uid"]
-                    add_user_to_next_round_query = '''
+                    add_user_to_next_round_query = (
+                        """
                                                     INSERT INTO captions.round
-                                                    SET round_uid =\'''' + new_round_uid + '''\',
-                                                    round_user_uid=\'''' + user_uid + '''\',
+                                                    SET round_uid =\'"""
+                        + new_round_uid
+                        + """\',
+                                                    round_user_uid=\'"""
+                        + user_uid
+                        + """\',
                                                     round_game_uid=(SELECT game_uid FROM captions.game
-                                                    WHERE game_code=\'''' + game_code + '''\'),
-                                                    round_number=\'''' + new_round_number + '''\', 
-                                                    round_deck_uid=\'''' + deck_uid + '''\',
+                                                    WHERE game_code=\'"""
+                        + game_code
+                        + """\'),
+                                                    round_number=\'"""
+                        + new_round_number
+                        + """\', 
+                                                    round_deck_uid=\'"""
+                        + deck_uid
+                        + """\',
                                                     votes=0,
                                                     score=0
-                                                    '''
+                                                    """
+                    )
                     next_round = execute(add_user_to_next_round_query, "post", conn)
                     # print("next_round info: ", next_round)
                     if next_round["code"] == 281:
@@ -2144,8 +2580,7 @@ class createNextRound(Resource):
             disconnect(conn)
 
 
-
-# INSERT ROWS IN Rounds TABLE FOR EACH PLAYER FOR EACH ROUND 
+# INSERT ROWS IN Rounds TABLE FOR EACH PLAYER FOR EACH ROUND
 class createRounds(Resource):
     def post(self):
         response = {}
@@ -2169,15 +2604,19 @@ class createRounds(Resource):
             image_count = len(imageURLs)
             # print("Number of images received: ", image_count)
             # print(len(data))
-            
+
             i = 0
 
             # NEED NUMBER OF ROUNDS, DECK UID AND GAME UID
-            game_query = '''
+            game_query = (
+                """
                     SELECT *
                     FROM captions.game
-                    WHERE game_code = \'''' + game_code + '''\';
-                    '''
+                    WHERE game_code = \'"""
+                + game_code
+                + """\';
+                    """
+            )
             game_data = execute(game_query, "get", conn)
             # print("game data:", game_data["result"])
             num_rounds = game_data["result"][i]["num_rounds"]
@@ -2193,11 +2632,15 @@ class createRounds(Resource):
                 return response
 
             # NEED NUMBER OF PLAYERS AND PLAYER UID
-            player_query = '''
+            player_query = (
+                """
                     SELECT DISTINCT round_user_uid
                     FROM captions.round
-                    WHERE round_game_uid = \'''' + game_uid + '''\';
-                    '''
+                    WHERE round_game_uid = \'"""
+                + game_uid
+                + """\';
+                    """
+            )
             player_data = execute(player_query, "get", conn)
             # print("player data:", player_data["result"])
             num_players = len(player_data["result"])
@@ -2207,7 +2650,6 @@ class createRounds(Resource):
             for p in range(num_players):
                 user_uid = player_data["result"][p]["round_user_uid"]
                 # print(user_uid)
-
 
             # CREATE ROWS FOR EACH PLAYER, EACH ROUND
             p = 0
@@ -2223,27 +2665,51 @@ class createRounds(Resource):
                     # print(new_round_uid, user_uid, game_uid, round, deck_uid)
 
                     if round == 1:
-                        add_user_to_next_round_query = '''
+                        add_user_to_next_round_query = (
+                            """
                                                     UPDATE captions.round
                                                     SET 
-                                                        round_deck_uid= \'''' + deck_uid + '''\',
-                                                        round_image_uid = \'''' + image + '''\'
+                                                        round_deck_uid= \'"""
+                            + deck_uid
+                            + """\',
+                                                        round_image_uid = \'"""
+                            + image
+                            + """\'
                                                     WHERE
-                                                        round_user_uid= \'''' + user_uid + '''\' AND
-                                                        round_game_uid= \'''' + game_uid + '''\';
-                                                    '''
+                                                        round_user_uid= \'"""
+                            + user_uid
+                            + """\' AND
+                                                        round_game_uid= \'"""
+                            + game_uid
+                            + """\';
+                                                    """
+                        )
                     else:
-                        add_user_to_next_round_query = '''
+                        add_user_to_next_round_query = (
+                            """
                                                     INSERT INTO captions.round
-                                                    SET round_uid = \'''' + new_round_uid + '''\',
-                                                    round_user_uid= \'''' + user_uid + '''\',
-                                                    round_game_uid= \'''' + game_uid + '''\',
-                                                    round_number= \'''' + str(round) + '''\', 
-                                                    round_deck_uid= \'''' + deck_uid + '''\',
-                                                    round_image_uid = \'''' + image + '''\',
+                                                    SET round_uid = \'"""
+                            + new_round_uid
+                            + """\',
+                                                    round_user_uid= \'"""
+                            + user_uid
+                            + """\',
+                                                    round_game_uid= \'"""
+                            + game_uid
+                            + """\',
+                                                    round_number= \'"""
+                            + str(round)
+                            + """\', 
+                                                    round_deck_uid= \'"""
+                            + deck_uid
+                            + """\',
+                                                    round_image_uid = \'"""
+                            + image
+                            + """\',
                                                     votes=0,
                                                     score=0
-                                                    '''
+                                                    """
+                        )
                     next_round = execute(add_user_to_next_round_query, "post", conn)
                     # print("next_round info: ", next_round)
                     if next_round["code"] == 281:
@@ -2255,13 +2721,17 @@ class createRounds(Resource):
                 continue
 
             # GET FIRST ROUND IMAGE
-            first_image_query = '''
+            first_image_query = (
+                """
                             SELECT DISTINCT round_image_uid 
                             FROM captions.round
                             WHERE
-                                round_game_uid = \'''' + game_uid + '''\' AND
+                                round_game_uid = \'"""
+                + game_uid
+                + """\' AND
                                 round_number = '1';
-                            '''
+                            """
+            )
             first_image_data = execute(first_image_query, "get", conn)
             # print("first image URL:", first_image_data["result"])
 
@@ -2287,14 +2757,20 @@ class getNextImage(Resource):
             round_number = data["round_number"]
             game_code = data["game_code"]
 
-            image_query = '''
+            image_query = (
+                """
                             SELECT DISTINCT round_image_uid 
                             FROM captions.round
                             WHERE
                                 round_game_uid = (SELECT game_uid FROM captions.game 
-                                                    WHERE game_code=\'''' + game_code + '''\')
-                                AND round_number=\'''' + round_number + '''\';
-                        '''
+                                                    WHERE game_code=\'"""
+                + game_code
+                + """\')
+                                AND round_number=\'"""
+                + round_number
+                + """\';
+                        """
+            )
             image = execute(image_query, "get", conn)
             # print("image URL:", image["result"])
             response["image"] = image["result"][0]["round_image_uid"]
@@ -2313,7 +2789,8 @@ class endGame(Resource):
         history_object = {}
         try:
             conn = connect()
-            get_game_info_query = '''select json_object('round_number', round_number, 
+            get_game_info_query = (
+                """select json_object('round_number', round_number, 
                                                         'round_deck_uid', round_deck_uid, 
                                                         'round_image_uid', round_image_uid
                                                         ) as json_round_info, 
@@ -2324,21 +2801,28 @@ class endGame(Resource):
                                                               'score', score)
                                                     ) as json_user_object from captions.round 
                                                     WHERE round_game_uid = (SELECT game_uid FROM captions.game 
-                                                        WHERE game_code=\'''' + game_code + '''\')
+                                                        WHERE game_code=\'"""
+                + game_code
+                + """\')
                                                     group by round_number;
-                                                    '''
+                                                    """
+            )
             game_info = execute(get_game_info_query, "get", conn)
             # print("game_info: ", game_info)
             if game_info["code"] == 280:
                 # print("num_rounds:", len(game_info["result"]))
                 for i in range(len(game_info["result"])):
-                    key = "round "+str(i+1)
+                    key = "round " + str(i + 1)
                     history_object[key] = {}
                     round_info = json.loads(game_info["result"][i]["json_round_info"])
                     # print(round_info, type(round_info))
                     history_object[key]["round_deck_uid"] = round_info["round_deck_uid"]
-                    history_object[key]["round_image_uid"] = round_info["round_image_uid"]
-                    user_info_str = json.loads(game_info["result"][i]["json_user_object"])
+                    history_object[key]["round_image_uid"] = round_info[
+                        "round_image_uid"
+                    ]
+                    user_info_str = json.loads(
+                        game_info["result"][i]["json_user_object"]
+                    )
                     history_object[key]["user_data"] = user_info_str
                     # print(user_info_str, type(user_info_str))
 
@@ -2346,13 +2830,21 @@ class endGame(Resource):
                 json_history_object = json.dumps(history_object, indent=4)
                 # print(json_history_object)
                 new_history_uid = get_new_historyUID(conn)
-                update_history_table = '''
+                update_history_table = (
+                    """
                                         INSERT INTO captions.game_history
-                                        SET history_uid = \'''' + new_history_uid + '''\',
+                                        SET history_uid = \'"""
+                    + new_history_uid
+                    + """\',
                                             history_game_uid = (SELECT game_uid FROM captions.game
-                                                    WHERE game_code=\'''' + game_code + '''\'),
-                                            history_obj = \'''' + json_history_object + '''\'
-                                        '''
+                                                    WHERE game_code=\'"""
+                    + game_code
+                    + """\'),
+                                            history_obj = \'"""
+                    + json_history_object
+                    + """\'
+                                        """
+                )
                 history_update = execute(update_history_table, "post", conn)
                 # print("history_update_info: ", history_update)
                 if history_update["code"] == 281:
@@ -2375,12 +2867,12 @@ class uploadImage(Resource):
             # print("image_title: ", image_title)
             image_cost = request.form.get("image_cost")
             # print("image_cost: ", image_cost)
-            image_description = request.form.get("image_description")
+            wimage_description = request.form.get("image_description")
             # print("image_description: ", image_description)
             image = request.files.get("image_file")
             # print("image: ", image)
 
-            #deck name
+            # deck name
             deck_name = request.form.get("deck_name")
             # print("deck_name: ", deck_name)
 
@@ -2388,48 +2880,69 @@ class uploadImage(Resource):
             # print("new_image_uid: ", new_image_uid)
 
             key = "caption_image/" + str(new_image_uid)
-            # print("image_key: ", key)
+            # key is the S3 object path where your uploaded image will be stored.
 
             image_url = helper_upload_user_img(image, key)
             # print("image_url: ", image_url)
 
-            add_image_query = '''
+            add_image_query = (
+                """
                             INSERT INTO captions.image
-                            SET image_uid = \'''' + new_image_uid + '''\',
-                                image_title = \'''' + image_title + '''\',
-                                image_url = \'''' + image_url + '''\',
-                                image_cost = \'''' + image_cost + '''\',
-                                image_description = \'''' + image_description + '''\'                    
-                            ''' 
+                            SET image_uid = \'"""
+                + new_image_uid
+                + """\',
+                                image_title = \'"""
+                + image_title
+                + """\',
+                                image_url = \'"""
+                + image_url
+                + """\',
+                                image_cost = \'"""
+                + image_cost
+                + """\',
+                                image_description = \'"""
+                + image_description
+                + """\'                    
+                            """
+            )
             image_response = execute(add_image_query, "post", conn)
             # print("image_response: ", image_response)
 
-
-            get_image_uids_query = '''
+            get_image_uids_query = (
+                """
                             SELECT deck_image_uids
                             FROM captions.deck    
-                            WHERE deck_title =\'''' + deck_name + '''\'                
-                            '''
+                            WHERE deck_title =\'"""
+                + deck_name
+                + """\'                
+                            """
+            )
             deck_response = execute(get_image_uids_query, "get", conn)
             # print("deck_response: ", deck_response)
 
             uid_string = deck_response["result"][0]["deck_image_uids"]
             # print("The following is the uid string", uid_string)
 
-            if(uid_string == "()"): #is this how we check for string deep equality in python?
-                uid_string = "(\"" + new_image_uid + "\")"
+            if (
+                uid_string == "()"
+            ):  # is this how we check for string deep equality in python?
+                uid_string = '("' + new_image_uid + '")'
             else:
-                uid_string = uid_string[:-1] + ", \"" + new_image_uid + "\")"
+                uid_string = uid_string[:-1] + ', "' + new_image_uid + '")'
 
             # print("The following is the new uid string", uid_string)
 
-
-
-            add_to_image_uids_query = '''
+            add_to_image_uids_query = (
+                """
                                             UPDATE captions.deck
-                                            SET deck_image_uids = \'''' + uid_string + '''\' 
-                                            WHERE deck_title =\'''' + deck_name + '''\' 
-                                            '''
+                                            SET deck_image_uids = \'"""
+                + uid_string
+                + """\' 
+                                            WHERE deck_title =\'"""
+                + deck_name
+                + """\' 
+                                            """
+            )
             update_deck_response = execute(add_to_image_uids_query, "post", conn)
             # print("update_deck_response: ", update_deck_response)
 
@@ -2438,6 +2951,197 @@ class uploadImage(Resource):
                 return response, 200
         except:
             raise BadRequest("upload image Request failed")
+        finally:
+            disconnect(conn)
+
+
+class uploadDriveImages(Resource):
+    def post(self):
+        response = {}
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+
+            drive_files = data.get("drive_files", [])
+            user_uid = data.get("user_uid", "PUBLIC")
+            deck_title = data.get(
+                "deck_title", f"Google Drive - {datetime.now().strftime('%Y-%m-%d')}"
+            )
+            access_token = data.get("access_token")  # OAuth token from frontend
+
+            if not drive_files:
+
+                return {"message": "No Drive files provided"}, 400
+
+            if not access_token:
+                return {"message": "Access token required for Drive download"}, 400
+
+            image_uids = []
+            stored_images = []
+            bucket = "iocaptions"
+
+            # Process each Drive file - download and upload to S3
+            for drive_file in drive_files:
+                try:
+                    file_id = drive_file.get("id")
+                    file_name = drive_file.get("name", f"drive_image_{file_id}")
+
+                    # Download image from Google Drive using OAuth token
+                    drive_download_url = (
+                        f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+                    )
+                    headers = {"Authorization": f"Bearer {access_token}"}
+
+                    download_response = requests.get(
+                        drive_download_url, headers=headers, timeout=30
+                    )
+
+                    if download_response.status_code != 200:
+                        continue
+
+                    # Get file extension
+                    file_ext = (
+                        file_name.rsplit(".", 1)[-1].lower()
+                        if "." in file_name
+                        else "jpg"
+                    )
+
+                    # Generate unique S3 key
+                    timestamp = int(time.time() * 1000)
+                    s3_key = f"drive_images/{user_uid}_{timestamp}_{uuid.uuid4().hex[:8]}.{file_ext}"
+
+                    # Upload to S3
+                    s3.put_object(
+                        Bucket=bucket,
+                        Body=download_response.content,
+                        Key=s3_key,
+                        ACL="public-read",
+                        ContentType=f"image/{file_ext}",
+                    )
+
+                    # Generate S3 URLs
+                    s3_url = f"https://{bucket}.s3.us-west-1.amazonaws.com/{s3_key}"
+
+                    # Generate new image UID
+                    new_image_uid = get_new_imageUID(conn)
+
+                    # Add image to database with S3 URL
+                    add_image_query = (
+                        """
+                        INSERT INTO captions.image
+                        SET image_uid = \'"""
+                        + new_image_uid
+                        + """\',
+                            image_title = \'"""
+                        + file_name.replace("'", "''")
+                        + """\',
+                            image_url = \'"""
+                        + s3_url
+                        + """\',
+                            image_cost = '0',
+                            image_description = 'Uploaded from Google Drive: """
+                        + file_name.replace("'", "''")
+                        + """\'
+                        """
+                    )
+                    image_db_response = execute(add_image_query, "post", conn)
+
+                    if image_db_response.get("code") == 281:
+                        image_uids.append(new_image_uid)
+                        stored_images.append(
+                            {
+                                "image_uid": new_image_uid,
+                                "image_url": s3_url,
+                                "thumbnail_url": s3_url,
+                                "filename": file_name,
+                            }
+                        )
+
+                except Exception as e:
+                    continue
+
+            # Create or update deck
+            deck_uid = None
+            if image_uids:
+                # Check if deck exists
+                check_deck_query = (
+                    """
+                    SELECT deck_uid, deck_image_uids FROM captions.deck
+                    WHERE deck_title = \'"""
+                    + deck_title.replace("'", "''")
+                    + """\' AND deck_user_uid = \'"""
+                    + user_uid
+                    + """\'
+                    """
+                )
+                existing_deck = execute(check_deck_query, "get", conn)
+
+                if existing_deck["code"] == 280 and existing_deck["result"]:
+                    # Deck exists - update it
+                    deck_uid = existing_deck["result"][0]["deck_uid"]
+                    existing_uids = existing_deck["result"][0]["deck_image_uids"]
+
+                    # Merge existing and new UIDs
+                    if existing_uids and existing_uids != "()":
+                        uid_string = (
+                            existing_uids[:-1] + ', "' + '", "'.join(image_uids) + '")'
+                        )
+                    else:
+                        uid_string = '("' + '", "'.join(image_uids) + '")'
+
+                    update_query = (
+                        """
+                        UPDATE captions.deck
+                        SET deck_image_uids = \'"""
+                        + uid_string
+                        + """\'
+                        WHERE deck_uid = \'"""
+                        + deck_uid
+                        + """\'
+                        """
+                    )
+                    execute(update_query, "post", conn)
+
+                else:
+                    # Create new deck
+                    deck_uid = get_new_deckUID(conn)
+                    uid_string = '("' + '", "'.join(image_uids) + '")'
+
+                    create_deck_query = (
+                        """
+                        INSERT INTO captions.deck
+                        SET deck_uid = \'"""
+                        + deck_uid
+                        + """\',
+                            deck_title = \'"""
+                        + deck_title.replace("'", "''")
+                        + """\',
+                            deck_user_uid = \'"""
+                        + user_uid
+                        + """\',
+                            deck_image_uids = \'"""
+                        + uid_string
+                        + """\',
+                            deck_thumbnail_url = \'"""
+                        + stored_images[0].get(
+                            "thumbnail_url", stored_images[0]["image_url"]
+                        )
+                        + """\',
+                            deck_description = 'Images uploaded from Google Drive'
+                        """
+                    )
+                    execute(create_deck_query, "post", conn)
+
+            response["message"] = (
+                f"{len(stored_images)} images successfully downloaded from Drive and uploaded to S3"
+            )
+            response["images"] = stored_images
+            response["deck_uid"] = deck_uid
+            response["total_stored"] = len(stored_images)
+            return response, 200
+
+        except Exception as e:
+            return {"message": f"Failed to process Drive images: {str(e)}"}, 500
         finally:
             disconnect(conn)
 
@@ -2456,60 +3160,80 @@ class CheckEmailValidationCode(Resource):
             code = data["code"]
             # print("user uid = ", user_uid, ", code = ", code)
 
-            get_verification_code_query = '''
-                            SELECT email_validated FROM captions.user WHERE user_uid=\'''' + user_uid + '''\'
-                            '''
+            get_verification_code_query = (
+                """
+                            SELECT email_validated FROM captions.user WHERE user_uid=\'"""
+                + user_uid
+                + """\'
+                            """
+            )
 
             validation = execute(get_verification_code_query, "get", conn)
             # print("validation info: ", validation)
 
-            #If for some reason we can't find a user in the table with the given user_uid....
+            # If for some reason we can't find a user in the table with the given user_uid....
             if len(validation["result"]) == 0:
-                response["message"] = "No user has been found for the following user_uid. " \
-                                      "Perhaps you have entered an invalid user_uid, " \
-                                      "or the endpoint to createNewUsers is broken"
+                response["message"] = (
+                    "No user has been found for the following user_uid. "
+                    "Perhaps you have entered an invalid user_uid, "
+                    "or the endpoint to createNewUsers is broken"
+                )
                 return response, 200
 
-            #If we do find such a user,
+            # If we do find such a user,
             # we will cross-examine the code they have typed in against what we have stored in the database.
-            #If it matches --> hooray! We set the email_validated of that user to true.
-            #If it DOES NOT match --> whoops! They typed in a bad code.
+            # If it matches --> hooray! We set the email_validated of that user to true.
+            # If it DOES NOT match --> whoops! They typed in a bad code.
             # print("first element of list", validation["result"][0])
             if validation["result"][0]["email_validated"] == "TRUE":
-                response["message"] = "User Email for this specific user has already been verified." \
-                                      " No need for a code! :)"
+                response["message"] = (
+                    "User Email for this specific user has already been verified."
+                    " No need for a code! :)"
+                )
                 response["email_validated_status"] = "TRUE"
 
             elif validation["result"][0]["email_validated"] == "FALSE":
-                response["message"] = "You need to generate a code for this user before you verify it."
+                response["message"] = (
+                    "You need to generate a code for this user before you verify it."
+                )
                 response["email_validated_status"] = "FALSE"
 
             elif validation["result"][0]["email_validated"] == code:
-                set_code_query = '''
+                set_code_query = (
+                    """
                                 UPDATE captions.user
-                                SET email_validated =\'''' + "TRUE" + '''\'
-                                WHERE user_uid=\'''' + user_uid + '''\'
-                                '''
+                                SET email_validated =\'"""
+                    + "TRUE"
+                    + """\'
+                                WHERE user_uid=\'"""
+                    + user_uid
+                    + """\'
+                                """
+                )
                 verification = execute(set_code_query, "post", conn)
                 # print("User code has been updated to TRUE")
-                response["message"] = "User Email Verification Code has been validated. Have fun!"
+                response["message"] = (
+                    "User Email Verification Code has been validated. Have fun!"
+                )
                 response["email_validated_status"] = "TRUE"
 
             else:
-                response["message"] = "Invalid Verification Code." \
-                                      "The code provided does not match what we have in the database"
+                response["message"] = (
+                    "Invalid Verification Code."
+                    "The code provided does not match what we have in the database"
+                )
                 response["email_validated_status"] = "..."
 
             return response, 200
         except:
-            raise BadRequest("Validate Email Verification Code Request Failed. Try again later. :(")
+            raise BadRequest(
+                "Validate Email Verification Code Request Failed. Try again later. :("
+            )
         finally:
             disconnect(conn)
 
         # ENDPOINT AND JSON OBJECT THAT WORKS
         # http://localhost:4000/api/v2/createappointmen
-
-
 
 
 class testHarvard(Resource):
@@ -2521,9 +3245,9 @@ class testHarvard(Resource):
             conn = connect()
             # print("connection established")
 
-            num = randint(1,376513)
-            page = num/10 + 1
-            index = num%10
+            num = randint(1, 376513)
+            page = num / 10 + 1
+            index = num % 10
 
             # page = randint(1,3751)
             # print(page)
@@ -2543,10 +3267,9 @@ class testHarvard(Resource):
 
             harvardURL = "https://api.harvardartmuseums.org/image?apikey=332993bc-6aca-4a69-bc9d-ae6cca29f633&page="
             harvardURL = harvardURL + str(page)
-            #print(harvardURL)
+            # print(harvardURL)
             r = requests.get(harvardURL)
-            #print(r.json()["records"][index]["baseimageurl"])
-
+            # print(r.json()["records"][index]["baseimageurl"])
 
             response["message"] = "testHarvard complete"
             response["result"] = r.json()["records"][index]["baseimageurl"]
@@ -2566,17 +3289,23 @@ class addFeedback(Resource):
             name = data["name"]
             email = data["email"]
             feedback = data["feedback"]
-            query = '''
+            query = (
+                """
                     UPDATE captions.user
-                    SET feedback = CONCAT_WS(\',\', feedback, \'''' + feedback + '''\')
-                    WHERE user_email = \'''' + email + '''\';
-                    '''
+                    SET feedback = CONCAT_WS(\',\', feedback, \'"""
+                + feedback
+                + """\')
+                    WHERE user_email = \'"""
+                + email
+                + """\';
+                    """
+            )
             execute(query, "post", conn)
             msg = Message(
                 "Feedback by " + name,
-                sender = "support@capshnz.com",
-                recipients = ["pmarathay@gmail.com"],
-                body = feedback
+                sender="support@capshnz.com",
+                recipients=["pmarathay@gmail.com"],
+                body=feedback,
             )
             mail.send(msg)
         except Exception as e:
@@ -2584,7 +3313,7 @@ class addFeedback(Resource):
         finally:
             disconnect(conn)
         return response, 200
-    
+
 
 class summary(Resource):
     def get(self):
@@ -2592,7 +3321,8 @@ class summary(Resource):
         try:
             conn = connect()
             game_uid = request.args.get("gameUID")
-            query = '''
+            query = (
+                """
                     SELECT r1.*
                     FROM captions.round r1
                         INNER JOIN (
@@ -2600,14 +3330,17 @@ class summary(Resource):
                                 round_number, 
                                 MAX(score) AS max_score
                             FROM captions.round
-                            WHERE round_game_uid = \'''' + game_uid + '''\'
+                            WHERE round_game_uid = \'"""
+                + game_uid
+                + """\'
                             GROUP BY round_number
                         ) r2 ON r1.round_game_uid = r2.round_game_uid 
                         AND r1.round_number = r2.round_number 
                         AND r1.score = r2.max_score
                         GROUP BY r1.round_uid, r1.round_number
                         ORDER BY r1.round_number;
-                    '''
+                    """
+            )
             captions = execute(query, "get", conn)["result"]
             round_number_set = set()
             for caption in captions:
@@ -2634,31 +3367,35 @@ class summaryEmail(Resource):
             # print("Data Received: ", data)
             game_uid = data["gameUID"]
             host_email = data["email"]
-            recipients = [host_email, 'pmarathay@yahoo.com']
-
+            recipients = [host_email, "pmarathay@yahoo.com"]
 
             # Get participant emails
-            emailQuery = '''
+            emailQuery = (
+                """
                     SELECT -- *
                         DISTINCT round_game_uid, round_user_uid, user_name, user_email
                     FROM captions.round
                     LEFT JOIN captions.user ON round_user_uid = user_uid
                     -- WHERE round_game_uid = "200-004165"
-                    WHERE round_game_uid = \'''' + game_uid + '''\'
-                    '''
+                    WHERE round_game_uid = \'"""
+                + game_uid
+                + """\'
+                    """
+            )
             emails = execute(emailQuery, "get", conn)["result"]
             # print(emails)
 
             # Extract emails, add to recipients, ensure uniqueness, and format as a list
-            recipients = list(set(recipients + [player['user_email'] for player in emails]))
+            recipients = list(
+                set(recipients + [player["user_email"] for player in emails])
+            )
 
             # Print the final list
             # print(recipients)
 
-
-
             # Get Game Images and Winning Captions
-            query = '''
+            query = (
+                """
                     SELECT r1.*
                     FROM captions.round r1
                         INNER JOIN (
@@ -2666,60 +3403,80 @@ class summaryEmail(Resource):
                                 round_number, 
                                 MAX(score) AS max_score
                             FROM captions.round
-                            WHERE round_game_uid = \'''' + game_uid + '''\'
+                            WHERE round_game_uid = \'"""
+                + game_uid
+                + """\'
                             GROUP BY round_number
                         ) r2 ON r1.round_game_uid = r2.round_game_uid 
                         AND r1.round_number = r2.round_number 
                         AND r1.score = r2.max_score
                         GROUP BY r1.round_uid, r1.round_number
                         ORDER BY r1.round_number;
-                    '''
+                    """
+            )
             captions = execute(query, "get", conn)["result"]
             content = ""
             round_number_set = set()
             for caption in captions:
-                round_img = "" 
+                round_img = ""
                 if caption["round_number"] not in round_number_set:
-                    round_img = """
-                        <h3>Round: """ + str(caption["round_number"]) + """</h3>
-                        <img src= """ + caption["round_image_uid"] + """ style="display:block;margin-left:auto;margin-right:auto;width:50%;height:50%;">
-                    """    
-                content = content + """
+                    round_img = (
+                        """
+                        <h3>Round: """
+                        + str(caption["round_number"])
+                        + """</h3>
+                        <img src= """
+                        + caption["round_image_uid"]
+                        + """ style="display:block;margin-left:auto;margin-right:auto;width:50%;height:50%;">
+                    """
+                    )
+                content = (
+                    content
+                    + """
                     <div style="text-align:center;display:block;margin-left:auto;margin-right:auto;">
-                        """ + round_img + """
-                        <h4>Caption: """ + caption["caption"] + """</h4>
+                        """
+                    + round_img
+                    + """
+                        <h4>Caption: """
+                    + caption["caption"]
+                    + """</h4>
                     </div>
                 """
+                )
                 round_number_set.add(caption["round_number"])
 
-            msg_html = """
+            msg_html = (
+                """
                 <!DOCTYPE html>
                 <html>
                     <body style="align:center">
                         <div style="padding:20px 0px">
                             <h2>Winning captions</h2>
-                            """ + content + """
+                            """
+                + content
+                + """
                         </div>
                     </body>
                 </html>
             """
+            )
 
             # Send Email
             msg = Message(
                 "Capshnz summary",
-                sender = "support@capshnz.com",
+                sender="support@capshnz.com",
                 # recipients = [host_email,'pmarathay@yahoo.com'],
-                recipients = recipients,
-                html = msg_html
+                recipients=recipients,
+                html=msg_html,
             )
             # print("message: ", msg)
 
             mail.send(msg)
-            response["Confrimation"] = 'email sent'
+            response["Confrimation"] = "email sent"
             response["Recipients"] = recipients
 
         except Exception as e:
-            response["Confrimation"] = 'email failure'
+            response["Confrimation"] = "email failure"
             # print(recipients)
             response["Recipients"] = recipients
             raise InternalServerError("An unknown error occurred") from e
@@ -2729,11 +3486,10 @@ class summaryEmail(Resource):
         return response, 200
 
 
-
 class CNNWebScrape(Resource):
-     def get(self):
+    def get(self):
         # print("in cnn web scraper")
-        response={}
+        response = {}
         try:
             conn = connect()
             # query = '''
@@ -2741,7 +3497,7 @@ class CNNWebScrape(Resource):
             #     WHERE game_code = \'''' + game_code + '''\';
             #     '''
             # query  = 'SELECT * FROM cnn_images'
-            query = 'SELECT id, article_link,date, week_no, year, thumbnail_link, title FROM cnn_images'
+            query = "SELECT id, article_link,date, week_no, year, thumbnail_link, title FROM cnn_images"
             items = execute(query, "get", conn)
             # print("items: ", items)
             if items["code"] == 280:
@@ -2756,25 +3512,35 @@ class CNNWebScrape(Resource):
             disconnect(conn)
         return response
 
+
 def get_pst_timestamp():
-    pst = timezone('America/Los_Angeles')
+    pst = timezone("America/Los_Angeles")
     current_time = datetime.now(pst)
-    return current_time.strftime('%Y-%m-%d %H:%M:%S')
+    return current_time.strftime("%Y-%m-%d %H:%M:%S")
+
 
 @app.before_request
 def before_request():
     g.start_time = time.time()
     # client_ip = request.remote_addr
     # print(f"Incoming request from IP: {client_ip} to {request.path} with method {request.method}")
-    
+
     # Handle CORS preflight requests
-    if request.method == 'OPTIONS':
-        response = jsonify({'status': 'OK'})
-        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', '*'))
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "OK"})
+        response.headers.add(
+            "Access-Control-Allow-Origin", request.headers.get("Origin", "*")
+        )
+        response.headers.add(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization, X-Requested-With",
+        )
+        response.headers.add(
+            "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"
+        )
+        response.headers.add("Access-Control-Allow-Credentials", "true")
         return response
+
 
 @app.after_request
 def after_request(response):
@@ -2786,15 +3552,19 @@ def after_request(response):
     method = request.method
     status_code = response.status_code
 
-    if method == 'OPTIONS':
-        return response
-    
-    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-
-    if client_ip == '127.0.0.1':
+    if method == "OPTIONS":
         return response
 
-    user_agent = request.headers.get('User-Agent', 'Unknown')
+    client_ip = (
+        request.headers.get("X-Forwarded-For", request.remote_addr)
+        .split(",")[0]
+        .strip()
+    )
+
+    if client_ip == "127.0.0.1":
+        return response
+
+    user_agent = request.headers.get("User-Agent", "Unknown")
     request_size = len(request.data) if request.data else 0
     response_size = len(response.data) if response.data else 0
     # referer = request.headers.get('Referer', 'None')
@@ -2812,21 +3582,21 @@ def after_request(response):
     )
 
     if endpoint != "/metrics" and endpoint != "/favicon.ico":
-        endpoint_parts = endpoint.split('/')
+        endpoint_parts = endpoint.split("/")
         if len(endpoint_parts) > 4:
-            normalized_endpoint = '/'.join(endpoint_parts[:4])
+            normalized_endpoint = "/".join(endpoint_parts[:4])
         else:
             normalized_endpoint = endpoint
 
         API_CALL_HISTORY.labels(
-        endpoint=normalized_endpoint,
-        client_ip=client_ip,
+            endpoint=normalized_endpoint,
+            client_ip=client_ip,
         ).inc()
 
         API_CALLS_TRACKER.labels(
             endpoint=normalized_endpoint,
             client_ip=client_ip,
-            timestamp=current_timestamp
+            timestamp=current_timestamp,
         ).set(1)
 
         REQUEST_COUNTER.labels(
@@ -2837,7 +3607,7 @@ def after_request(response):
             client_ip=client_ip,
             user_agent=user_agent,
             request_size=request_size,
-            response_size=response_size
+            response_size=response_size,
         ).inc()
         LATENCY_SUMMARY.labels(endpoint=endpoint, method=method).observe(latency)
 
@@ -2853,115 +3623,139 @@ def after_request(response):
     # ).inc()
     # LATENCY_SUMMARY.labels(endpoint=endpoint, method=method).observe(latency)
 
+
 @app.errorhandler(Exception)
 def handle_exception(e):
-    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-    logger.error(f"Unhandled Exception: {str(e)}, IP: {client_ip}, Endpoint: {request.path}")
+    client_ip = (
+        request.headers.get("X-Forwarded-For", request.remote_addr)
+        .split(",")[0]
+        .strip()
+    )
+    logger.error(
+        f"Unhandled Exception: {str(e)}, IP: {client_ip}, Endpoint: {request.path}"
+    )
     return jsonify({"error": "Internal server error"}), 500
+
 
 class Metrics(Resource):
     def get(self):
         return Response(generate_latest(registry), mimetype=CONTENT_TYPE_LATEST)
-    
+
+
 # -- GOOGLE API ENDPOINTS (from app.py) --------------------------------------------------------
 
-@app.route('/', methods=['GET'])
+
+@app.route("/", methods=["GET"])
 def root():
     """Root endpoint"""
-    return jsonify({
-        'message': 'Caption Backend API',
-        'version': '1.0.0',
-        'status': 'running',
-        'endpoints': {
-            'health': '/api/health',
-            'oauth': '/api/oauth/url',
-            'oauth_mobile': '/api/oauth/url/mobile',
-            'oauth_mobile_direct': '/api/oauth/mobile-url',
-            'oauth_mobile_token': '/api/oauth/mobile-token',
-            'user_profile': '/api/user/profile',
-            'photo_picker': '/api/photos/picker/session',
-            'drive_files': '/api/drive/files',
-            'calendar_events': '/api/calendar/events',
-            'drive_photos': '/api/drive/photos'
+    return jsonify(
+        {
+            "message": "Caption Backend API",
+            "version": "1.0.0",
+            "status": "running",
+            "endpoints": {
+                "health": "/api/health",
+                "oauth": "/api/oauth/url",
+                "oauth_mobile": "/api/oauth/url/mobile",
+                "oauth_mobile_direct": "/api/oauth/mobile-url",
+                "oauth_mobile_token": "/api/oauth/mobile-token",
+                "user_profile": "/api/user/profile",
+                "photo_picker": "/api/photos/picker/session",
+                "drive_files": "/api/drive/files",
+                "calendar_events": "/api/calendar/events",
+                "drive_photos": "/api/drive/photos",
+            },
         }
-    })
+    )
 
-@app.route('/api/health', methods=['GET'])
+
+@app.route("/api/health", methods=["GET"])
 def health_check():
     """Health check endpoint"""
-    return jsonify({
-        'status': 'OK',
-        'message': 'Google API Demo Backend is running',
-        'timestamp': datetime.now().isoformat(),
-        'version': '1.0.0'
-    })
+    return jsonify(
+        {
+            "status": "OK",
+            "message": "Google API Demo Backend is running",
+            "timestamp": datetime.now().isoformat(),
+            "version": "1.0.0",
+        }
+    )
 
-@app.route('/api/oauth/url', methods=['GET'])
+
+@app.route("/api/oauth/url", methods=["GET"])
 def get_oauth_url():
     """Get OAuth URL for mobile"""
     try:
         code_verifier = generate_code_verifier()
         code_challenge = generate_code_challenge(code_verifier)
-        
+
         # Store code verifier for later use
         session_id = str(uuid.uuid4())
-        user_agent = request.headers.get('User-Agent', 'unknown')
-        
+
+        user_agent = request.headers.get("User-Agent", "unknown")
+
+        game_uid = request.args.get("gameUID")
+        user_uid = request.args.get("userUID")
+        game_code = request.args.get("gameCode")
+
         # Check platform and determine appropriate redirect URI
-        platform = request.args.get('platform', '').lower()
-        client = request.args.get('client', '').lower()
-        
+        platform = request.args.get("platform", "").lower()
+        client = request.args.get("client", "").lower()
+
         # Detect platform from User-Agent if not specified
         if not platform and not client:
-            if 'ReactNative' in user_agent or 'Expo' in user_agent:
+            if "ReactNative" in user_agent or "Expo" in user_agent:
                 # Try to detect specific platform from User-Agent
-                if 'Android' in user_agent:
-                    platform = 'android'
-                elif 'iPhone' in user_agent or 'iPad' in user_agent:
-                    platform = 'ios'
+                if "Android" in user_agent:
+                    platform = "android"
+                elif "iPhone" in user_agent or "iPad" in user_agent:
+                    platform = "ios"
                 else:
-                    platform = 'react-native'  # Generic React Native
-        
+                    platform = "react-native"  # Generic React Native
+
         # Store session with platform info
         active_sessions[session_id] = {
-            'code_verifier': code_verifier,
-            'timestamp': datetime.now().timestamp(),
-            'user_agent': user_agent,
-            'platform': platform  # Store platform for later use in callback
+            "code_verifier": code_verifier,
+            "timestamp": datetime.now().timestamp(),
+            "user_agent": user_agent,
+            "platform": platform,  # Store platform for later use in callback
+            "gameUID": game_uid,
+            "userUID": user_uid,
+            "gameCode": game_code,
         }
-        
+
         # Determine redirect URI based on client type
         redirect_uri = REDIRECT_URI  # Default to web redirect
-        
+
         # Determine redirect URI based on platform
-        if platform == 'web':
+        if platform == "web":
             # Web platform - use web redirect URI
             redirect_uri = REDIRECT_URI
             print(f"🌐 Using web redirect URI: {redirect_uri}")
-        elif platform == 'android':
+        elif platform == "android":
             # Android React Native - use AWS API Gateway URL
             redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
             print(f"🤖 Using Android redirect URI: {redirect_uri}")
-        elif platform == 'ios':
+        elif platform == "ios":
             # iOS React Native - use AWS API Gateway URL
             redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
             print(f"📱 Using iOS redirect URI: {redirect_uri}")
-        elif platform in ['react-native'] or client == 'react-native':
+        elif platform in ["react-native"] or client == "react-native":
             # Generic React Native - use AWS API Gateway URL
             redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
             print(f"📱 Using React Native redirect URI: {redirect_uri}")
         else:
             # Default to web for unknown platforms
             print(f"🌐 Using default web redirect URI: {redirect_uri}")
-        
+
         scopes = [
-            'https://www.googleapis.com/auth/userinfo.profile',
-            'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/drive.readonly',
-            'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
+            "https://www.googleapis.com/auth/userinfo.profile",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/drive.readonly",
+            "https://www.googleapis.com/auth/calendar.readonly",
+            "https://www.googleapis.com/auth/photospicker.mediaitems.readonly",
         ]
-        
+
         auth_url = (
             f"https://accounts.google.com/o/oauth2/v2/auth?"
             f"response_type=code&"
@@ -2975,49 +3769,52 @@ def get_oauth_url():
             f"prompt=consent&"
             f"state={session_id}"
         )
-        
-        return jsonify({
-            'authUrl': auth_url,
-            'sessionId': session_id,
-            'redirectUri': redirect_uri,
-            'platform': platform,
-            'message': 'Use this URL for OAuth flow',
-            'expiresIn': 600  # 10 minutes
-        })
-        
+
+        return jsonify(
+            {
+                "authUrl": auth_url,
+                "sessionId": session_id,
+                "redirectUri": redirect_uri,
+                "platform": platform,
+                "message": "Use this URL for OAuth flow",
+                "expiresIn": 600,  # 10 minutes
+            }
+        )
+
     except Exception as e:
         print(f"Error generating OAuth URL: {e}")
-        return jsonify({'error': 'Failed to generate OAuth URL'}), 500
+        return jsonify({"error": "Failed to generate OAuth URL"}), 500
 
-@app.route('/api/oauth/url/mobile', methods=['GET'])
+
+@app.route("/api/oauth/url/mobile", methods=["GET"])
 def get_oauth_url_mobile():
     """Get OAuth URL specifically for React Native mobile"""
     try:
         code_verifier = generate_code_verifier()
         code_challenge = generate_code_challenge(code_verifier)
-        
+
         # Store code verifier for later use
         session_id = str(uuid.uuid4())
-        user_agent = request.headers.get('User-Agent', 'unknown')
-        
+        user_agent = request.headers.get("User-Agent", "unknown")
+
         active_sessions[session_id] = {
-            'code_verifier': code_verifier,
-            'timestamp': datetime.now().timestamp(),
-            'user_agent': user_agent
+            "code_verifier": code_verifier,
+            "timestamp": datetime.now().timestamp(),
+            "user_agent": user_agent,
         }
-        
+
         # Always use React Native redirect URI for this endpoint
         redirect_uri = "googleapidemo://photos/selection"
         print(f"📱 Using React Native redirect URI: {redirect_uri}")
-        
+
         scopes = [
-            'https://www.googleapis.com/auth/userinfo.profile',
-            'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/drive.readonly',
-            'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
+            "https://www.googleapis.com/auth/userinfo.profile",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/drive.readonly",
+            "https://www.googleapis.com/auth/calendar.readonly",
+            "https://www.googleapis.com/auth/photospicker.mediaitems.readonly",
         ]
-        
+
         auth_url = (
             f"https://accounts.google.com/o/oauth2/v2/auth?"
             f"response_type=code&"
@@ -3031,51 +3828,54 @@ def get_oauth_url_mobile():
             f"prompt=consent&"
             f"state={session_id}"
         )
-        
-        return jsonify({
-            'authUrl': auth_url,
-            'sessionId': session_id,
-            'redirectUri': redirect_uri,
-            'platform': 'react-native',
-            'message': 'Use this URL for React Native OAuth flow',
-            'expiresIn': 600  # 10 minutes
-        })
-        
+
+        return jsonify(
+            {
+                "authUrl": auth_url,
+                "sessionId": session_id,
+                "redirectUri": redirect_uri,
+                "platform": "react-native",
+                "message": "Use this URL for React Native OAuth flow",
+                "expiresIn": 600,  # 10 minutes
+            }
+        )
+
     except Exception as e:
         print(f"Error generating mobile OAuth URL: {e}")
-        return jsonify({'error': 'Failed to generate mobile OAuth URL'}), 500
+        return jsonify({"error": "Failed to generate mobile OAuth URL"}), 500
 
-@app.route('/api/oauth/mobile-url', methods=['GET'])
+
+@app.route("/api/oauth/mobile-url", methods=["GET"])
 def get_mobile_oauth_url():
     """Get OAuth URL for React Native mobile apps (direct authentication)"""
     try:
         # Generate PKCE parameters
         code_verifier = generate_code_verifier()
         code_challenge = generate_code_challenge(code_verifier)
-        
+
         # Generate session ID
         session_id = str(uuid.uuid4())
-        
+
         # Store session for later token exchange
         active_sessions[session_id] = {
-            'code_verifier': code_verifier,
-            'timestamp': datetime.now().timestamp(),
-            'user_agent': request.headers.get('User-Agent', 'unknown'),
-            'platform': 'mobile'
+            "code_verifier": code_verifier,
+            "timestamp": datetime.now().timestamp(),
+            "user_agent": request.headers.get("User-Agent", "unknown"),
+            "platform": "mobile",
         }
-        
+
         # Scopes for mobile
         scopes = [
-            'https://www.googleapis.com/auth/userinfo.profile',
-            'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/drive.readonly',
-            'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'
+            "https://www.googleapis.com/auth/userinfo.profile",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/drive.readonly",
+            "https://www.googleapis.com/auth/calendar.readonly",
+            "https://www.googleapis.com/auth/photospicker.mediaitems.readonly",
         ]
-        
+
         # Use AWS API Gateway redirect URI (works for all platforms)
         redirect_uri = "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback"
-        
+
         # Build OAuth URL
         auth_url = (
             f"https://accounts.google.com/o/oauth2/v2/auth?"
@@ -3090,78 +3890,87 @@ def get_mobile_oauth_url():
             f"prompt=consent&"
             f"state={session_id}"
         )
-        
-        return jsonify({
-            'authUrl': auth_url,
-            'sessionId': session_id,
-            'redirectUri': redirect_uri,
-            'codeVerifier': code_verifier,  # Frontend needs this for token exchange
-            'platform': 'mobile',
-            'message': 'Use this URL for direct mobile OAuth flow',
-            'expiresIn': 600
-        })
-        
+
+        return jsonify(
+            {
+                "authUrl": auth_url,
+                "sessionId": session_id,
+                "redirectUri": redirect_uri,
+                "codeVerifier": code_verifier,  # Frontend needs this for token exchange
+                "platform": "mobile",
+                "message": "Use this URL for direct mobile OAuth flow",
+                "expiresIn": 600,
+            }
+        )
+
     except Exception as e:
         print(f"Error generating mobile OAuth URL: {e}")
-        return jsonify({'error': 'Failed to generate mobile OAuth URL'}), 500
+        return jsonify({"error": "Failed to generate mobile OAuth URL"}), 500
 
-@app.route('/api/oauth/mobile-token', methods=['POST'])
+
+@app.route("/api/oauth/mobile-token", methods=["POST"])
 def exchange_mobile_token():
     """Exchange code for token (mobile direct authentication)"""
     try:
         data = request.get_json() or {}
-        code = data.get('code')
-        session_id = data.get('sessionId')
-        code_verifier = data.get('codeVerifier')
-        
+        code = data.get("code")
+        session_id = data.get("sessionId")
+        code_verifier = data.get("codeVerifier")
+
         if not code or not session_id or not code_verifier:
-            return jsonify({'error': 'Missing required parameters'}), 400
-        
+            return jsonify({"error": "Missing required parameters"}), 400
+
         # Verify session exists
         session = active_sessions.get(session_id)
         if not session:
-            return jsonify({'error': 'Invalid or expired session'}), 400
-        
+            return jsonify({"error": "Invalid or expired session"}), 400
+
         # Exchange code for token using PKCE
         token_data = {
-            'client_id': GOOGLE_CLIENT_ID,
-            'code': code,
-            'grant_type': 'authorization_code',
-            'redirect_uri': 'https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback',
-            'code_verifier': code_verifier
+            "client_id": GOOGLE_CLIENT_ID,
+            "code": code,
+            "grant_type": "authorization_code",
+            "redirect_uri": "https://bmarz6chil.execute-api.us-west-1.amazonaws.com/dev/api/oauth/callback",
+            "code_verifier": code_verifier,
         }
-        
+
         response = requests.post(
-            'https://oauth2.googleapis.com/token',
+            "https://oauth2.googleapis.com/token",
             data=token_data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        
+
         if response.status_code != 200:
-            return jsonify({'error': 'Token exchange failed', 'details': response.text}), 500
-        
+            return (
+                jsonify({"error": "Token exchange failed", "details": response.text}),
+                500,
+            )
+
         tokens = response.json()
-        
+
         # Store tokens in session
-        active_sessions[session_id]['tokens'] = tokens
-        
-        return jsonify({
-            'success': True,
-            'sessionId': session_id,
-            'tokens': {
-                'access_token': tokens['access_token'],
-                'refresh_token': tokens.get('refresh_token'),
-                'expires_in': tokens['expires_in'],
-                'scope': tokens.get('scope'),
-                'token_type': tokens.get('token_type')
+        active_sessions[session_id]["tokens"] = tokens
+
+        return jsonify(
+            {
+                "success": True,
+                "sessionId": session_id,
+                "tokens": {
+                    "access_token": tokens["access_token"],
+                    "refresh_token": tokens.get("refresh_token"),
+                    "expires_in": tokens["expires_in"],
+                    "scope": tokens.get("scope"),
+                    "token_type": tokens.get("token_type"),
+                },
             }
-        })
-        
+        )
+
     except Exception as e:
         print(f"Mobile token exchange error: {e}")
-        return jsonify({'error': 'Token exchange failed', 'details': str(e)}), 500
+        return jsonify({"error": "Token exchange failed", "details": str(e)}), 500
 
-@app.route('/api/oauth/token', methods=['POST'])
+
+@app.route("/api/oauth/token", methods=["POST"])
 def exchange_code_for_token():
     """Exchange code for token"""
     try:
@@ -3170,240 +3979,251 @@ def exchange_code_for_token():
             data = request.get_json() or {}
         except Exception:
             data = {}
-        code = data.get('code')
-        state = data.get('state')
-        user_id = data.get('userId')
-        
+        code = data.get("code")
+        state = data.get("state")
+        user_id = data.get("userId")
+
         if not code or not state:
-            return jsonify({'error': 'Missing code or state parameter'}), 400
-        
+            return jsonify({"error": "Missing code or state parameter"}), 400
+
         # Retrieve code verifier from session
         session = active_sessions.get(state)
         if not session:
-            return jsonify({'error': 'Invalid or expired session'}), 400
-        
+            return jsonify({"error": "Invalid or expired session"}), 400
+
         # Check if session is expired (10 minutes)
-        if datetime.now().timestamp() - session['timestamp'] > 600:
+        if datetime.now().timestamp() - session["timestamp"] > 600:
             active_sessions.pop(state, None)
-            return jsonify({'error': 'Session expired'}), 400
-        
-        code_verifier = session['code_verifier']
-        
+            return jsonify({"error": "Session expired"}), 400
+
+        code_verifier = session["code_verifier"]
+
         # Exchange code for token
         token_data = {
-            'client_id': GOOGLE_CLIENT_ID,
-            'client_secret': GOOGLE_CLIENT_SECRET,
-            'code': code,
-            'grant_type': 'authorization_code',
-            'redirect_uri': REDIRECT_URI,
-            'code_verifier': code_verifier
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "code": code,
+            "grant_type": "authorization_code",
+            "redirect_uri": REDIRECT_URI,
+            "code_verifier": code_verifier,
         }
-        
+
         response = requests.post(
-            'https://oauth2.googleapis.com/token',
+            "https://oauth2.googleapis.com/token",
             data=token_data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        
+
         if response.status_code != 200:
-            return jsonify({'error': 'Token exchange failed'}), 500
-        
+            return jsonify({"error": "Token exchange failed"}), 500
+
         token_response = response.json()
-        
+
         # Clean up session
         active_sessions.pop(state, None)
-        
+
         # Store user token
         user_token_id = user_id or str(uuid.uuid4())
         user_tokens[user_token_id] = {
-            'access_token': token_response['access_token'],
-            'refresh_token': token_response.get('refresh_token'),
-            'expires_at': datetime.now().timestamp() + token_response['expires_in'],
-            'user_id': user_token_id
+            "access_token": token_response["access_token"],
+            "refresh_token": token_response.get("refresh_token"),
+            "expires_at": datetime.now().timestamp() + token_response["expires_in"],
+            "user_id": user_token_id,
         }
-        
-        return jsonify({
-            'access_token': token_response['access_token'],
-            'refresh_token': token_response.get('refresh_token'),
-            'expires_in': token_response['expires_in'],
-            'scope': token_response.get('scope'),
-            'user_id': user_token_id
-        })
-        
+
+        return jsonify(
+            {
+                "access_token": token_response["access_token"],
+                "refresh_token": token_response.get("refresh_token"),
+                "expires_in": token_response["expires_in"],
+                "scope": token_response.get("scope"),
+                "user_id": user_token_id,
+            }
+        )
+
     except Exception as e:
         print(f"Token exchange error: {e}")
-        return jsonify({'error': 'Token exchange failed', 'details': str(e)}), 500
+        return jsonify({"error": "Token exchange failed", "details": str(e)}), 500
 
-@app.route('/api/oauth/callback', methods=['GET'])
+
+@app.route("/api/oauth/callback", methods=["GET"])
 def oauth_callback():
     """OAuth callback endpoint"""
     print("🔄 OAUTH CALLBACK ENDPOINT HIT!")
     print(f"🔄 Request from: {request.remote_addr}")
-    
+
     try:
-        code = request.args.get('code')
-        state = request.args.get('state')
-        
+        code = request.args.get("code")
+        state = request.args.get("state")
+
         print(f"🔄 Query params - code: {code}, state: {state}")
-        
+
         if not code or not state:
             print("❌ Missing code or state in query parameters")
-            return jsonify({'error': 'Missing code or state'}), 400
-        
+            return jsonify({"error": "Missing code or state"}), 400
+
         # Get stored code verifier for PKCE
         session = active_sessions.get(state)
         if not session:
             print(f"❌ Session not found for state: {state}")
-            return jsonify({'error': 'Invalid or expired session'}), 400
-        
-        code_verifier = session['code_verifier']
+            return jsonify({"error": "Invalid or expired session"}), 400
+
+        code_verifier = session["code_verifier"]
         if not code_verifier:
             print(f"❌ Code verifier not found for session: {state}")
-            return jsonify({'error': 'Missing code verifier'}), 400
-        
+            return jsonify({"error": "Missing code verifier"}), 400
+
         # Exchange code for tokens with Google (using PKCE)
         token_data = {
-            'code': code,
-            'client_id': GOOGLE_CLIENT_ID,
-            'client_secret': GOOGLE_CLIENT_SECRET,
-            'redirect_uri': REDIRECT_URI,
-            'grant_type': 'authorization_code',
-            'code_verifier': code_verifier
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": REDIRECT_URI,
+            "grant_type": "authorization_code",
+            "code_verifier": code_verifier,
         }
-        
+
         print("🌐 Making request to Google OAuth token endpoint")
-        
+
         response = requests.post(
-            'https://oauth2.googleapis.com/token',
+            "https://oauth2.googleapis.com/token",
             data=token_data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        
+
         if response.status_code != 200:
             print(f"❌ Google token exchange failed: {response.text}")
-            return jsonify({'error': 'Token exchange failed'}), 500
-        
+            return jsonify({"error": "Token exchange failed"}), 500
+
         tokens = response.json()
         print("✅ Successfully exchanged code for tokens")
-        
+
         # Store tokens with state for later retrieval
         if state:
             active_sessions[state] = {
-                'tokens': tokens,
-                'timestamp': datetime.now().timestamp(),
-                'code_verifier': code_verifier
+                "tokens": tokens,
+                "timestamp": datetime.now().timestamp(),
+                "code_verifier": code_verifier,
             }
             print(f"💾 Tokens stored for state: {state}")
         else:
             print("❌ No state provided, cannot store tokens")
-        
+
         # Determine redirect URL based on the original request
         session = active_sessions.get(state, {})
-        user_agent = session.get('user_agent', '')
-        
+        user_agent = session.get("user_agent", "")
+
         # Get the platform from the stored session (if available)
         # We can store platform info in the session when creating the OAuth URL
-        platform = session.get('platform', 'web')
-        
-        if platform == 'web':
+        platform = session.get("platform", "web")
+
+        if platform == "web":
             # For web, redirect to frontend URL
             redirect_url = f"{FRONTEND_URL}?sessionId={state}&success=true"
             print(f"🌐 Redirecting to web frontend: {redirect_url}")
-        elif platform in ['android', 'ios', 'react-native']:
+        elif platform in ["android", "ios", "react-native"]:
             # For React Native, redirect directly to the mobile app deep link
-            redirect_url = f"googleapidemo://photos/selection?sessionId={state}&success=true"
+            redirect_url = (
+                f"googleapidemo://photos/selection?sessionId={state}&success=true"
+            )
             print(f"📱 Redirecting to mobile app: {redirect_url}")
         else:
             # Fallback to web
             redirect_url = f"{FRONTEND_URL}?sessionId={state}&success=true"
             print(f"🌐 Redirecting to web frontend (fallback): {redirect_url}")
-        
+
         return redirect(redirect_url)
-        
+
     except Exception as e:
         print(f"❌ Error in OAuth callback: {e}")
-        return jsonify({'error': 'OAuth callback failed', 'details': str(e)}), 500
+        return jsonify({"error": "OAuth callback failed", "details": str(e)}), 500
 
-@app.route('/api/oauth/token/<session_id>', methods=['GET'])
+
+@app.route("/api/oauth/token/<session_id>", methods=["GET"])
 def get_tokens_by_session_id(session_id):
     """Get tokens by session ID"""
     try:
         print(f"🔍 Retrieving tokens for session ID: {session_id}")
-        
+
         if not session_id:
-            return jsonify({'error': 'Session ID is required'}), 400
-        
+            return jsonify({"error": "Session ID is required"}), 400
+
         # Get session from active_sessions
         session = active_sessions.get(session_id)
         if not session:
             print(f"❌ Session not found for ID: {session_id}")
-            return jsonify({'error': 'Session not found or expired'}), 404
-        
+            return jsonify({"error": "Session not found or expired"}), 404
+
         # Check if session is expired (10 minutes)
-        if datetime.now().timestamp() - session['timestamp'] > 600:
+        if datetime.now().timestamp() - session["timestamp"] > 600:
             print(f"❌ Session expired for ID: {session_id}")
             active_sessions.pop(session_id, None)
-            return jsonify({'error': 'Session expired'}), 410
-        
+            return jsonify({"error": "Session expired"}), 410
+
         # Check if tokens exist
-        if 'tokens' not in session:
+        if "tokens" not in session:
             print(f"❌ No tokens found for session ID: {session_id}")
-            return jsonify({'error': 'No tokens found for this session'}), 404
-        
+            return jsonify({"error": "No tokens found for this session"}), 404
+
         print(f"✅ Tokens retrieved for session ID: {session_id}")
-        
+
         # Return the tokens (excluding sensitive data like codeVerifier)
         response = {
-            'access_token': session['tokens']['access_token'],
-            'expires_in': session['tokens']['expires_in'],
-            'refresh_token': session['tokens'].get('refresh_token'),
-            'scope': session['tokens'].get('scope'),
-            'token_type': session['tokens'].get('token_type')
+            "access_token": session["tokens"]["access_token"],
+            "expires_in": session["tokens"]["expires_in"],
+            "refresh_token": session["tokens"].get("refresh_token"),
+            "scope": session["tokens"].get("scope"),
+            "token_type": session["tokens"].get("token_type"),
         }
-        
+
         # Optionally include id_token if present
-        if 'id_token' in session['tokens']:
-            response['id_token'] = session['tokens']['id_token']
-        
+        if "id_token" in session["tokens"]:
+            response["id_token"] = session["tokens"]["id_token"]
+
         return jsonify(response)
-        
+
     except Exception as e:
         print(f"❌ Error retrieving tokens for session {session_id}: {e}")
-        return jsonify({'error': 'Failed to retrieve tokens', 'details': str(e)}), 500
+        return jsonify({"error": "Failed to retrieve tokens", "details": str(e)}), 500
 
-@app.route('/api/user/profile', methods=['GET'])
+
+@app.route("/api/user/profile", methods=["GET"])
 def get_user_profile():
     """Get user profile"""
     try:
-        user_id = request.args.get('user_id')
-        auth_header = request.headers.get('Authorization')
-        
+        user_id = request.args.get("user_id")
+        auth_header = request.headers.get("Authorization")
+
         access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
+        if auth_header and auth_header.startswith("Bearer "):
+            access_token = auth_header.split(" ")[1]
         elif user_id:
             user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
+            if not user_token or datetime.now().timestamp() > user_token["expires_at"]:
+                return jsonify({"error": "Token expired or invalid"}), 401
+            access_token = user_token["access_token"]
         else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
+            return jsonify({"error": "Missing authorization"}), 401
+
         response = requests.get(
-            'https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses,photos',
-            headers={'Authorization': f'Bearer {access_token}'}
+            "https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses,photos",
+            headers={"Authorization": f"Bearer {access_token}"},
         )
-        
+
         if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch profile', 'details': response.text}), 500
-        
+            return (
+                jsonify({"error": "Failed to fetch profile", "details": response.text}),
+                500,
+            )
+
         return jsonify(response.json())
-        
+
     except Exception as e:
         print(f"Profile fetch error: {e}")
-        return jsonify({'error': 'Failed to fetch profile', 'details': str(e)}), 500
+        return jsonify({"error": "Failed to fetch profile", "details": str(e)}), 500
 
-@app.route('/api/photos/picker/session', methods=['POST'])
+
+@app.route("/api/photos/picker/session", methods=["POST"])
 def create_photo_picker_session():
     """Create Photo Picker session"""
     try:
@@ -3412,140 +4232,179 @@ def create_photo_picker_session():
             data = request.get_json() or {}
         except Exception:
             data = {}
-        user_id = data.get('user_id')
-        auth_header = request.headers.get('Authorization')
-        
+        user_id = data.get("user_id")
+        auth_header = request.headers.get("Authorization")
+
         access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
+        if auth_header and auth_header.startswith("Bearer "):
+            access_token = auth_header.split(" ")[1]
         elif user_id:
             user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
+            if not user_token or datetime.now().timestamp() > user_token["expires_at"]:
+                return jsonify({"error": "Token expired or invalid"}), 401
+            access_token = user_token["access_token"]
         else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
+            return jsonify({"error": "Missing authorization"}), 401
+
         response = requests.post(
-            'https://photospicker.googleapis.com/v1/sessions',
+            "https://photospicker.googleapis.com/v1/sessions",
             headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {access_token}'
-            }
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {access_token}",
+            },
         )
-        
+
         if response.status_code != 200:
-            return jsonify({'error': 'Failed to create Photo Picker session', 'details': response.text}), 500
-        
+            return (
+                jsonify(
+                    {
+                        "error": "Failed to create Photo Picker session",
+                        "details": response.text,
+                    }
+                ),
+                500,
+            )
+
         return jsonify(response.json())
-        
+
     except Exception as e:
         print(f"Photo Picker session creation error: {e}")
-        return jsonify({'error': 'Failed to create Photo Picker session', 'details': str(e)}), 500
+        return (
+            jsonify(
+                {"error": "Failed to create Photo Picker session", "details": str(e)}
+            ),
+            500,
+        )
 
-@app.route('/api/photos/picker/media', methods=['GET'])
+
+@app.route("/api/photos/picker/media", methods=["GET"])
 def get_photo_picker_media():
     """Get selected photos from Photo Picker"""
     try:
-        session_id = request.args.get('sessionId')
-        user_id = request.args.get('user_id')
-        page_size = int(request.args.get('pageSize', 25))
-        
+        session_id = request.args.get("sessionId")
+        user_id = request.args.get("user_id")
+        page_size = int(request.args.get("pageSize", 25))
+
         print(f"📸 Photo Picker request - sessionId: {session_id}, user_id: {user_id}")
-        
+
         if not session_id:
-            return jsonify({'error': 'Session ID is required'}), 400
-        
-        auth_header = request.headers.get('Authorization')
-        
+            return jsonify({"error": "Session ID is required"}), 400
+
+        auth_header = request.headers.get("Authorization")
+
         access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
-            print(f"🔑 Using access token from Authorization header: {access_token[:20]}...")
+        if auth_header and auth_header.startswith("Bearer "):
+            access_token = auth_header.split(" ")[1]
+            print(
+                f"🔑 Using access token from Authorization header: {access_token[:20]}..."
+            )
         elif user_id:
             user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
+            if not user_token or datetime.now().timestamp() > user_token["expires_at"]:
+                return jsonify({"error": "Token expired or invalid"}), 401
+            access_token = user_token["access_token"]
             print(f"🔑 Using access token from user_tokens: {access_token[:20]}...")
         else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
-        params = {
-            'sessionId': session_id,
-            'pageSize': page_size
-        }
-        
+            return jsonify({"error": "Missing authorization"}), 401
+
+        params = {"sessionId": session_id, "pageSize": page_size}
+
         print(f"🌐 Making request to Google Photo Picker API with params: {params}")
-        
+
         response = requests.get(
-            'https://photospicker.googleapis.com/v1/mediaItems',
+            "https://photospicker.googleapis.com/v1/mediaItems",
             params=params,
-            headers={'Authorization': f'Bearer {access_token}'}
+            headers={"Authorization": f"Bearer {access_token}"},
         )
-        
+
         print(f"📡 Google API response status: {response.status_code}")
         print(f"📡 Google API response: {response.text[:200]}...")
-        
+
         if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch selected photos', 'details': response.text}), 500
-        
+            return (
+                jsonify(
+                    {
+                        "error": "Failed to fetch selected photos",
+                        "details": response.text,
+                    }
+                ),
+                500,
+            )
+
         return jsonify(response.json())
-        
+
     except Exception as e:
         print(f"Photo Picker media fetch error: {e}")
-        return jsonify({'error': 'Failed to fetch selected photos', 'details': str(e)}), 500
+        return (
+            jsonify({"error": "Failed to fetch selected photos", "details": str(e)}),
+            500,
+        )
 
-@app.route('/api/photos/picker/url', methods=['GET'])
+
+@app.route("/api/photos/picker/url", methods=["GET"])
 def get_photo_picker_url():
     """Get Photo Picker URL for WebView"""
     try:
-        user_id = request.args.get('user_id')
-        auth_header = request.headers.get('Authorization')
-        
+        user_id = request.args.get("user_id")
+        auth_header = request.headers.get("Authorization")
+
         access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
+        if auth_header and auth_header.startswith("Bearer "):
+            access_token = auth_header.split(" ")[1]
         elif user_id:
             user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
+            if not user_token or datetime.now().timestamp() > user_token["expires_at"]:
+                return jsonify({"error": "Token expired or invalid"}), 401
+            access_token = user_token["access_token"]
         else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
+            return jsonify({"error": "Missing authorization"}), 401
+
         # Create Photo Picker session
         session_response = requests.post(
-            'https://photospicker.googleapis.com/v1/sessions',
+            "https://photospicker.googleapis.com/v1/sessions",
             headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {access_token}'
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {access_token}",
+            },
+        )
+
+        if session_response.status_code != 200:
+            return (
+                jsonify(
+                    {
+                        "error": "Failed to get Photo Picker URL",
+                        "details": session_response.text,
+                    }
+                ),
+                500,
+            )
+
+        session_data = session_response.json()
+
+        return jsonify(
+            {
+                "pickerUrl": session_data["pickerUri"],
+                "sessionId": session_data["id"],
+                "message": "Use this URL in WebView for Photo Picker",
             }
         )
-        
-        if session_response.status_code != 200:
-            return jsonify({'error': 'Failed to get Photo Picker URL', 'details': session_response.text}), 500
-        
-        session_data = session_response.json()
-        
-        return jsonify({
-            'pickerUrl': session_data['pickerUri'],
-            'sessionId': session_data['id'],
-            'message': 'Use this URL in WebView for Photo Picker'
-        })
-        
+
     except Exception as e:
         print(f"Photo Picker URL error: {e}")
-        return jsonify({'error': 'Failed to get Photo Picker URL', 'details': str(e)}), 500
+        return (
+            jsonify({"error": "Failed to get Photo Picker URL", "details": str(e)}),
+            500,
+        )
 
-@app.route('/mobile-redirect', methods=['GET'])
+
+@app.route("/mobile-redirect", methods=["GET"])
 def mobile_redirect():
     """Mobile redirect page that redirects to the mobile app"""
     try:
-        session_id = request.args.get('sessionId')
-        success = request.args.get('success')
-        platform = request.args.get('platform', 'react-native')
-        
+        session_id = request.args.get("sessionId")
+        success = request.args.get("success")
+        platform = request.args.get("platform", "react-native")
+
         # Create a mobile-friendly HTML page that redirects to the mobile app
         html_content = f"""
         <!DOCTYPE html>
@@ -3628,14 +4487,18 @@ def mobile_redirect():
         </body>
         </html>
         """
-        
-        return html_content, 200, {'Content-Type': 'text/html'}
-        
+
+        return html_content, 200, {"Content-Type": "text/html"}
+
     except Exception as e:
         print(f"Mobile redirect error: {e}")
-        return f"<html><body><h1>Error</h1><p>Failed to redirect: {str(e)}</p></body></html>", 500
+        return (
+            f"<html><body><h1>Error</h1><p>Failed to redirect: {str(e)}</p></body></html>",
+            500,
+        )
 
-@app.route('/api/oauth/refresh', methods=['POST'])
+
+@app.route("/api/oauth/refresh", methods=["POST"])
 def refresh_token():
     """Refresh token endpoint"""
     try:
@@ -3644,187 +4507,226 @@ def refresh_token():
             data = request.get_json() or {}
         except Exception:
             data = {}
-        refresh_token = data.get('refresh_token')
-        user_id = data.get('user_id')
-        
+        refresh_token = data.get("refresh_token")
+        user_id = data.get("user_id")
+
         if not refresh_token:
-            return jsonify({'error': 'Refresh token is required'}), 400
-        
+            return jsonify({"error": "Refresh token is required"}), 400
+
         response = requests.post(
-            'https://oauth2.googleapis.com/token',
+            "https://oauth2.googleapis.com/token",
             data={
-                'client_id': GOOGLE_CLIENT_ID,
-                'client_secret': GOOGLE_CLIENT_SECRET,
-                'refresh_token': refresh_token,
-                'grant_type': 'refresh_token'
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
             },
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        
+
         if response.status_code != 200:
-            return jsonify({'error': 'Token refresh failed', 'details': response.text}), 500
-        
+            return (
+                jsonify({"error": "Token refresh failed", "details": response.text}),
+                500,
+            )
+
         token_data = response.json()
-        
+
         # Update stored token
         if user_id and user_id in user_tokens:
-            user_tokens[user_id]['access_token'] = token_data['access_token']
-            user_tokens[user_id]['expires_at'] = datetime.now().timestamp() + token_data['expires_in']
-        
-        return jsonify({
-            'access_token': token_data['access_token'],
-            'expires_in': token_data['expires_in']
-        })
-        
+            user_tokens[user_id]["access_token"] = token_data["access_token"]
+            user_tokens[user_id]["expires_at"] = (
+                datetime.now().timestamp() + token_data["expires_in"]
+            )
+
+        return jsonify(
+            {
+                "access_token": token_data["access_token"],
+                "expires_in": token_data["expires_in"],
+            }
+        )
+
     except Exception as e:
         print(f"Token refresh error: {e}")
-        return jsonify({'error': 'Token refresh failed', 'details': str(e)}), 500
+        return jsonify({"error": "Token refresh failed", "details": str(e)}), 500
 
-@app.route('/api/drive/files', methods=['GET'])
+
+@app.route("/api/drive/files", methods=["GET"])
 def get_drive_files():
     """Get Drive files"""
     try:
-        user_id = request.args.get('user_id')
-        page_size = int(request.args.get('pageSize', 20))
-        auth_header = request.headers.get('Authorization')
-        
+        user_id = request.args.get("user_id")
+        page_size = int(request.args.get("pageSize", 20))
+        auth_header = request.headers.get("Authorization")
+
         access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
+        if auth_header and auth_header.startswith("Bearer "):
+            access_token = auth_header.split(" ")[1]
         elif user_id:
             user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
+            if not user_token or datetime.now().timestamp() > user_token["expires_at"]:
+                return jsonify({"error": "Token expired or invalid"}), 401
+            access_token = user_token["access_token"]
         else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
+            return jsonify({"error": "Missing authorization"}), 401
+
         params = {
-            'pageSize': page_size,
-            'fields': 'files(id,name,mimeType,createdTime,modifiedTime,size,webViewLink,thumbnailLink,imageMediaMetadata)',
-            'orderBy': 'modifiedTime desc'
+            "pageSize": page_size,
+            "fields": "files(id,name,mimeType,createdTime,modifiedTime,size,webViewLink,thumbnailLink,imageMediaMetadata)",
+            "orderBy": "modifiedTime desc",
         }
-        
+
         response = requests.get(
-            'https://www.googleapis.com/drive/v3/files',
+            "https://www.googleapis.com/drive/v3/files",
             params=params,
-            headers={'Authorization': f'Bearer {access_token}'}
+            headers={"Authorization": f"Bearer {access_token}"},
         )
-        
+
         if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch Drive files', 'details': response.text}), 500
-        
+            return (
+                jsonify(
+                    {"error": "Failed to fetch Drive files", "details": response.text}
+                ),
+                500,
+            )
+
         return jsonify(response.json())
-        
+
     except Exception as e:
         print(f"Drive files fetch error: {e}")
-        return jsonify({'error': 'Failed to fetch Drive files', 'details': str(e)}), 500
+        return jsonify({"error": "Failed to fetch Drive files", "details": str(e)}), 500
 
-@app.route('/api/calendar/events', methods=['GET'])
+
+@app.route("/api/calendar/events", methods=["GET"])
 def get_calendar_events():
     """Get Calendar events"""
     try:
-        date = request.args.get('date')
-        user_id = request.args.get('user_id')
-        
+        date = request.args.get("date")
+        user_id = request.args.get("user_id")
+
         if not date:
-            return jsonify({'error': 'Date parameter is required'}), 400
-        
-        auth_header = request.headers.get('Authorization')
-        
+            return jsonify({"error": "Date parameter is required"}), 400
+
+        auth_header = request.headers.get("Authorization")
+
         access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
+        if auth_header and auth_header.startswith("Bearer "):
+            access_token = auth_header.split(" ")[1]
         elif user_id:
             user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
+            if not user_token or datetime.now().timestamp() > user_token["expires_at"]:
+                return jsonify({"error": "Token expired or invalid"}), 401
+            access_token = user_token["access_token"]
         else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
+            return jsonify({"error": "Missing authorization"}), 401
+
         time_min = f"{date}T00:00:00Z"
         time_max = f"{date}T23:59:59Z"
-        
+
         params = {
-            'timeMin': time_min,
-            'timeMax': time_max,
-            'maxResults': 20,
-            'singleEvents': True,
-            'orderBy': 'startTime'
+            "timeMin": time_min,
+            "timeMax": time_max,
+            "maxResults": 20,
+            "singleEvents": True,
+            "orderBy": "startTime",
         }
-        
+
         response = requests.get(
-            'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events",
             params=params,
-            headers={'Authorization': f'Bearer {access_token}'}
+            headers={"Authorization": f"Bearer {access_token}"},
         )
-        
+
         if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch Calendar events', 'details': response.text}), 500
-        
+            return (
+                jsonify(
+                    {
+                        "error": "Failed to fetch Calendar events",
+                        "details": response.text,
+                    }
+                ),
+                500,
+            )
+
         return jsonify(response.json())
-        
+
     except Exception as e:
         print(f"Calendar events fetch error: {e}")
-        return jsonify({'error': 'Failed to fetch Calendar events', 'details': str(e)}), 500
+        return (
+            jsonify({"error": "Failed to fetch Calendar events", "details": str(e)}),
+            500,
+        )
 
-@app.route('/api/drive/photos', methods=['GET'])
+
+@app.route("/api/drive/photos", methods=["GET"])
 def get_drive_photos():
     """Get Drive photos"""
     try:
-        user_id = request.args.get('user_id')
-        page_size = int(request.args.get('pageSize', 20))
-        auth_header = request.headers.get('Authorization')
-        
+        user_id = request.args.get("user_id")
+        page_size = int(request.args.get("pageSize", 20))
+        auth_header = request.headers.get("Authorization")
+
         access_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token = auth_header.split(' ')[1]
+        if auth_header and auth_header.startswith("Bearer "):
+            access_token = auth_header.split(" ")[1]
         elif user_id:
             user_token = user_tokens.get(user_id)
-            if not user_token or datetime.now().timestamp() > user_token['expires_at']:
-                return jsonify({'error': 'Token expired or invalid'}), 401
-            access_token = user_token['access_token']
+            if not user_token or datetime.now().timestamp() > user_token["expires_at"]:
+                return jsonify({"error": "Token expired or invalid"}), 401
+            access_token = user_token["access_token"]
         else:
-            return jsonify({'error': 'Missing authorization'}), 401
-        
+            return jsonify({"error": "Missing authorization"}), 401
+
         params = {
-            'q': "mimeType contains 'image/'",
-            'pageSize': page_size,
-            'fields': 'files(id,name,mimeType,createdTime,modifiedTime,size,webViewLink,thumbnailLink,imageMediaMetadata,webContentLink)',
-            'orderBy': 'modifiedTime desc'
+            "q": "mimeType contains 'image/'",
+            "pageSize": page_size,
+            "fields": "files(id,name,mimeType,createdTime,modifiedTime,size,webViewLink,thumbnailLink,imageMediaMetadata,webContentLink)",
+            "orderBy": "modifiedTime desc",
         }
-        
+
         response = requests.get(
-            'https://www.googleapis.com/drive/v3/files',
+            "https://www.googleapis.com/drive/v3/files",
             params=params,
-            headers={'Authorization': f'Bearer {access_token}'}
+            headers={"Authorization": f"Bearer {access_token}"},
         )
-        
+
         if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch Drive photos', 'details': response.text}), 500
-        
+            return (
+                jsonify(
+                    {"error": "Failed to fetch Drive photos", "details": response.text}
+                ),
+                500,
+            )
+
         # Transform the data for mobile
-        files = response.json().get('files', [])
+        files = response.json().get("files", [])
         photos = [
             {
-                'id': file['id'],
-                'name': file['name'],
-                'url': file['webViewLink'],
-                'thumbnails': [{'url': file['thumbnailLink']}] if file.get('thumbnailLink') else [],
-                'mimeType': file['mimeType'],
-                'size': file.get('size'),
-                'modifiedTime': file['modifiedTime'],
-                'imageMetadata': file.get('imageMediaMetadata')
+                "id": file["id"],
+                "name": file["name"],
+                "url": file["webViewLink"],
+                "thumbnails": (
+                    [{"url": file["thumbnailLink"]}]
+                    if file.get("thumbnailLink")
+                    else []
+                ),
+                "mimeType": file["mimeType"],
+                "size": file.get("size"),
+                "modifiedTime": file["modifiedTime"],
+                "imageMetadata": file.get("imageMediaMetadata"),
             }
             for file in files
         ]
-        
-        return jsonify({'photos': photos, 'totalCount': len(photos)})
-        
+
+        return jsonify({"photos": photos, "totalCount": len(photos)})
+
     except Exception as e:
         print(f"Drive photos fetch error: {e}")
-        return jsonify({'error': 'Failed to fetch Drive photos', 'details': str(e)}), 500
+        return (
+            jsonify({"error": "Failed to fetch Drive photos", "details": str(e)}),
+            500,
+        )
+
 
 # -- DEFINE APIS -------------------------------------------------------------------------------
 
@@ -3837,9 +4739,11 @@ api.add_resource(addUser, "/api/v2/addUser")
 # api.add_resource(createNewGame, "/api/v2/createNewGame")
 api.add_resource(joinGame, "/api/v2/joinGame")
 api.add_resource(getPlayers, "/api/v2/getPlayers/<string:game_code>")
-#api.add_resource(decks, "/api/v2/decks")
+# api.add_resource(decks, "/api/v2/decks")
 api.add_resource(decks, "/api/v2/decks/<string:user_uid>,<string:public_decks>")
-api.add_resource(gameTimer, "/api/v2/gameTimer/<string:game_code>,<string:round_number>")
+api.add_resource(
+    gameTimer, "/api/v2/gameTimer/<string:game_code>,<string:round_number>"
+)
 api.add_resource(selectDeck, "/api/v2/selectDeck")
 api.add_resource(uploadDeviceImage, "/api/v2/uploadDeviceImage")
 api.add_resource(assignDeck, "/api/v2/assignDeck")
@@ -3851,25 +4755,50 @@ api.add_resource(createRounds, "/api/v2/createRounds")
 api.add_resource(getNextImage, "/api/v2/getNextImage")
 
 
-api.add_resource(getRoundImage, "/api/v2/getRoundImage/<string:game_code>,<string:round_number>")
+api.add_resource(
+    getRoundImage, "/api/v2/getRoundImage/<string:game_code>,<string:round_number>"
+)
 api.add_resource(postRoundImage, "/api/v2/postRoundImage")
 # api.add_resource(roundImage, "/api/v2/roundImage/<string:game_code>,<string:round_number>")
 
 
 api.add_resource(submitCaption, "/api/v2/submitCaption")
-api.add_resource(getPlayersRemainingToSubmitCaption,
-                 "/api/v2/getPlayersRemainingToSubmitCaption/<string:game_code>,<string:round_number>")
-api.add_resource(getAllSubmittedCaptions, "/api/v2/getAllSubmittedCaptions/<string:game_code>,<string:round_number>")
+api.add_resource(
+    getPlayersRemainingToSubmitCaption,
+    "/api/v2/getPlayersRemainingToSubmitCaption/<string:game_code>,<string:round_number>",
+)
+api.add_resource(
+    getAllSubmittedCaptions,
+    "/api/v2/getAllSubmittedCaptions/<string:game_code>,<string:round_number>",
+)
 api.add_resource(voteCaption, "/api/v2/voteCaption")
-api.add_resource(getPlayersWhoHaventVoted, "/api/v2/getPlayersWhoHaventVoted/<string:game_code>,<string:round_number>")
+api.add_resource(
+    getPlayersWhoHaventVoted,
+    "/api/v2/getPlayersWhoHaventVoted/<string:game_code>,<string:round_number>",
+)
 api.add_resource(createNextRound, "/api/v2/createNextRound")
-api.add_resource(updateScores, "/api/v2/updateScores/<string:game_code>,<string:round_number>")
-api.add_resource(getScoreBoard, "/api/v2/getScoreBoard/<string:game_code>,<string:round_number>")
-api.add_resource(getScores, "/api/v2/getScores/<string:game_code>,<string:round_number>")
-api.add_resource(startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>")
-api.add_resource(getImageForPlayers, "/api/v2/getImageForPlayers/<string:game_code>,<string:round_number>")
+api.add_resource(
+    updateScores, "/api/v2/updateScores/<string:game_code>,<string:round_number>"
+)
+api.add_resource(
+    getScoreBoard, "/api/v2/getScoreBoard/<string:game_code>,<string:round_number>"
+)
+api.add_resource(
+    getScores, "/api/v2/getScores/<string:game_code>,<string:round_number>"
+)
+api.add_resource(
+    startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>"
+)
+api.add_resource(uploadDriveImages, "/api/v2/uploadDriveImages")
+api.add_resource(
+    getImageForPlayers,
+    "/api/v2/getImageForPlayers/<string:game_code>,<string:round_number>",
+)
 api.add_resource(endGame, "/api/v2/endGame/<string:game_code>")
-api.add_resource(getUniqueImageInRound, "/api/v2/getUniqueImageInRound/<string:game_code>,<string:round_number>")
+api.add_resource(
+    getUniqueImageInRound,
+    "/api/v2/getUniqueImageInRound/<string:game_code>,<string:round_number>",
+)
 api.add_resource(uploadImage, "/api/v2/uploadImage")
 api.add_resource(SendError, "/api/v2/sendError/<string:code1>*<string:code2>")
 # api.add_resource(CheckEmailValidated, "/api/v2/checkEmailValidated")
@@ -3883,8 +4812,9 @@ api.add_resource(summaryEmail, "/api/v2/summaryEmail")
 api.add_resource(Metrics, "/metrics")
 
 ## webscrape api
-api.add_resource(CNNWebScrape , "/api/v2/cnn_webscrape")
+api.add_resource(CNNWebScrape, "/api/v2/cnn_webscrape")
 # Run on below IP address and port
 # Make sure port number is unused (i.e. don't use numbers 0-1023)
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=4030)
+    # 0.0.0.0 allows connections from any device on the network (needed for mobile development)
+    app.run(host="0.0.0.0", port=4030)
