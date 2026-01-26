@@ -1158,6 +1158,461 @@ class uploadDeviceImage(Resource):
             disconnect(conn)
 
 
+class uploadDriveImages(Resource):
+    def post(self):
+        response = {}
+        uploaded_images = []
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+
+            print(f"Upload Drive Images Request")
+            print(f"Received data: {data}")
+
+            # Get image URLs from Google Drive
+            drive_images = data.get("drive_images", [])
+            game_uid = data.get("game_uid")
+            user_uid = data.get("user_uid")
+            deck_name = data.get("deck_name", "Google Drive")
+            access_token = data.get("access_token")  # OAuth token from frontend
+
+            print(f"Has access token: {bool(access_token)}")
+
+            if not drive_images or len(drive_images) == 0:
+                return {"message": "No Drive images provided"}, 400
+
+            total_images = len(drive_images)
+            print(
+                f"📦 Processing {total_images} Drive images (using thumbnails for speed)..."
+            )
+
+            for idx, drive_image in enumerate(drive_images, 1):
+                try:
+                    # Get image URL - prefer thumbnailUrl for faster uploads, fallback to fullSizeUrl
+                    image_url = (
+                        drive_image.get("thumbnailUrl")
+                        or drive_image.get("fullSizeUrl")
+                        or drive_image.get("url")
+                    )
+                    image_name = drive_image.get(
+                        "name", f"drive_image_{drive_image.get('id')}"
+                    )
+
+                    if not image_url:
+                        print(f"⚠️ Skipping image {idx}/{total_images} - no URL")
+                        continue
+
+                    # Download image from Drive URL
+                    print(
+                        f"⬇️ [{idx}/{total_images}] Downloading thumbnail: {image_name[:50]}..."
+                    )
+                    import requests
+
+                    # If we have an access token and the URL is a Drive API endpoint, use it
+                    headers = {}
+                    if access_token and "googleapis.com" in image_url:
+                        headers["Authorization"] = f"Bearer {access_token}"
+                        print("Using OAuth token for download")
+
+                    # For Google Drive download links, we need to handle the confirmation page
+                    img_response = requests.get(
+                        image_url, headers=headers, timeout=30, allow_redirects=True
+                    )
+
+                    if img_response.status_code != 200:
+                        print(f"Failed to download image: {img_response.status_code}")
+                        print(f"Response: {img_response.text[:200]}")
+                        continue
+
+                    # Generate new image UID
+                    new_image_uid = get_new_imageUID(conn)
+                    print(f"🆔 New image UID: {new_image_uid}")
+
+                    # Determine file extension from URL or default to jpg
+                    file_extension = "jpg"
+                    if "." in image_name:
+                        file_extension = image_name.rsplit(".", 1)[1].lower()
+
+                    # Create S3 key
+                    key = f"caption_image/{new_image_uid}.{file_extension}"
+
+                    # Upload to S3
+                    bucket = "iocaptions"
+                    s3_filename = (
+                        "https://" + bucket + ".s3.us-west-1.amazonaws.com/" + str(key)
+                    )
+
+                    upload_file = s3.put_object(
+                        Bucket=bucket,
+                        Body=img_response.content,
+                        Key=key,
+                        ACL="public-read",
+                        ContentType=img_response.headers.get(
+                            "Content-Type", "image/jpeg"
+                        ),
+                    )
+
+                    print(f"⬆️ [{idx}/{total_images}] Uploaded to S3: {new_image_uid}")
+
+                    # Save to database
+                    image_title = image_name
+                    image_description = f"Google Drive image: {drive_image.get('id')}"
+
+                    add_image_query = (
+                        """
+                        INSERT INTO captions.image
+                        SET image_uid = \'"""
+                        + new_image_uid
+                        + """\',
+                            image_title = \'"""
+                        + image_title.replace("'", "''")
+                        + """\',
+                            image_url = \'"""
+                        + s3_filename
+                        + """\',
+                            image_cost = '0',
+                            image_description = \'"""
+                        + image_description.replace("'", "''")
+                        + """\'
+                        """
+                    )
+                    image_db_response = execute(add_image_query, "post", conn)
+                    print(f"Database insert result: {image_db_response}")
+
+                    if image_db_response.get("code") == 281:
+                        uploaded_images.append(
+                            {
+                                "image_uid": new_image_uid,
+                                "image_url": s3_filename,
+                                "drive_id": drive_image.get("id"),
+                                "filename": image_name,
+                            }
+                        )
+
+                except Exception as img_error:
+                    print(
+                        f"Error processing image {drive_image.get('id')}: {str(img_error)}"
+                    )
+                    continue
+
+            # If deck_name provided, create or update deck with these images
+            if deck_name and len(uploaded_images) > 0:
+                # Build UID string
+                uid_list = [img["image_uid"] for img in uploaded_images]
+                uid_string = '("' + '", "'.join(uid_list) + '")'
+
+                # Check if deck exists
+                check_deck_query = (
+                    """
+                    SELECT deck_uid, deck_image_uids
+                    FROM captions.deck
+                    WHERE deck_title = \'"""
+                    + deck_name
+                    + """\'
+                    AND deck_user_uid = \'"""
+                    + user_uid
+                    + """\'
+                    """
+                )
+                deck_check = execute(check_deck_query, "get", conn)
+
+                if deck_check.get("code") == 280 and deck_check["result"]:
+                    # Update existing deck
+                    existing_uid_string = deck_check["result"][0]["deck_image_uids"]
+
+                    if existing_uid_string and existing_uid_string != "()":
+                        # Merge with existing UIDs
+                        uid_string = (
+                            existing_uid_string[:-1]
+                            + ', "'
+                            + '", "'.join(uid_list)
+                            + '")'
+                        )
+
+                    update_deck_query = (
+                        """
+                        UPDATE captions.deck
+                        SET deck_image_uids = \'"""
+                        + uid_string
+                        + """\'
+                        WHERE deck_title = \'"""
+                        + deck_name
+                        + """\'
+                        AND deck_user_uid = \'"""
+                        + user_uid
+                        + """\'
+                        """
+                    )
+                    execute(update_deck_query, "post", conn)
+                    response["deck_uid"] = deck_check["result"][0]["deck_uid"]
+                else:
+                    # Create new deck
+                    new_deck_uid = get_new_deckUID(conn)
+                    thumbnail_url = (
+                        uploaded_images[0]["image_url"] if uploaded_images else ""
+                    )
+
+                    create_deck_query = (
+                        """
+                        INSERT INTO captions.deck
+                        SET deck_uid = \'"""
+                        + new_deck_uid
+                        + """\',
+                            deck_title = \'"""
+                        + deck_name
+                        + """\',
+                            deck_user_uid = \'"""
+                        + user_uid
+                        + """\',
+                            deck_image_uids = \'"""
+                        + uid_string
+                        + """\',
+                            deck_thumbnail_url = \'"""
+                        + thumbnail_url
+                        + """\',
+                            deck_description = 'Google Drive images'
+                        """
+                    )
+                    execute(create_deck_query, "post", conn)
+                    response["deck_uid"] = new_deck_uid
+
+            response["message"] = (
+                f"{len(uploaded_images)} Drive images uploaded successfully"
+            )
+            response["images"] = uploaded_images
+            response["total_uploaded"] = len(uploaded_images)
+            response["game_uid"] = game_uid
+            response["user_uid"] = user_uid
+
+            return response, 200
+
+        except Exception as e:
+            print(f"Error uploading Drive images: {str(e)}")
+            import traceback
+
+            traceback.print_exc()
+            return {"message": f"Upload failed: {str(e)}"}, 500
+        finally:
+            disconnect(conn)
+
+
+class uploadGooglePhotos(Resource):
+    def post(self):
+        response = {}
+        uploaded_images = []
+        try:
+            conn = connect()
+            data = request.get_json(force=True)
+
+            print(f"Upload Google Photos Request")
+            print(f"Received data: {data}")
+
+            # Get image URLs from Google Photos
+            google_photos = data.get("google_photos", [])
+            game_uid = data.get("game_uid")
+            user_uid = data.get("user_uid")
+            deck_name = data.get("deck_name", "Google Photos")
+
+            if not google_photos or len(google_photos) == 0:
+                return {"message": "No Google Photos provided"}, 400
+
+            for photo in google_photos:
+                try:
+                    # Get image URL (use fullSizeUrl or url)
+                    image_url = photo.get("fullSizeUrl") or photo.get("url")
+                    image_name = photo.get("name", f"photo_{photo.get('id')}")
+
+                    if not image_url:
+                        print(f"Skipping photo without URL: {photo}")
+                        continue
+
+                    # Download image from Google Photos URL
+                    print(f"Downloading photo from: {image_url}")
+                    import requests
+
+                    img_response = requests.get(image_url, timeout=10)
+
+                    if img_response.status_code != 200:
+                        print(f"Failed to download photo: {img_response.status_code}")
+                        continue
+
+                    # Generate new image UID
+                    new_image_uid = get_new_imageUID(conn)
+                    print(f"New image UID: {new_image_uid}")
+
+                    # Determine file extension from mimeType or default to jpg
+                    file_extension = "jpg"
+                    mime_type = photo.get("mimeType", "")
+                    if "jpeg" in mime_type or "jpg" in mime_type:
+                        file_extension = "jpg"
+                    elif "png" in mime_type:
+                        file_extension = "png"
+                    elif "gif" in mime_type:
+                        file_extension = "gif"
+                    elif "." in image_name:
+                        file_extension = image_name.rsplit(".", 1)[1].lower()
+
+                    # Create S3 key
+                    key = f"caption_image/{new_image_uid}.{file_extension}"
+
+                    # Upload to S3
+                    bucket = "iocaptions"
+                    s3_filename = (
+                        "https://" + bucket + ".s3.us-west-1.amazonaws.com/" + str(key)
+                    )
+
+                    upload_file = s3.put_object(
+                        Bucket=bucket,
+                        Body=img_response.content,
+                        Key=key,
+                        ACL="public-read",
+                        ContentType=img_response.headers.get(
+                            "Content-Type", "image/jpeg"
+                        ),
+                    )
+
+                    print(f"Uploaded to S3: {s3_filename}")
+
+                    # Save to database
+                    image_title = image_name
+                    image_description = f"Google Photos image: {photo.get('id')}"
+
+                    add_image_query = (
+                        """
+                        INSERT INTO captions.image
+                        SET image_uid = \'"""
+                        + new_image_uid
+                        + """\',
+                            image_title = \'"""
+                        + image_title.replace("'", "''")
+                        + """\',
+                            image_url = \'"""
+                        + s3_filename
+                        + """\',
+                            image_cost = '0',
+                            image_description = \'"""
+                        + image_description.replace("'", "''")
+                        + """\'
+                        """
+                    )
+                    image_db_response = execute(add_image_query, "post", conn)
+                    print(f"Database insert result: {image_db_response}")
+
+                    if image_db_response.get("code") == 281:
+                        uploaded_images.append(
+                            {
+                                "image_uid": new_image_uid,
+                                "image_url": s3_filename,
+                                "photo_id": photo.get("id"),
+                                "filename": image_name,
+                            }
+                        )
+
+                except Exception as img_error:
+                    print(f"Error processing photo {photo.get('id')}: {str(img_error)}")
+                    continue
+
+            # If deck_name provided, create or update deck with these images
+            if deck_name and len(uploaded_images) > 0:
+                # Build UID string
+                uid_list = [img["image_uid"] for img in uploaded_images]
+                uid_string = '("' + '", "'.join(uid_list) + '")'
+
+                # Check if deck exists
+                check_deck_query = (
+                    """
+                    SELECT deck_uid, deck_image_uids
+                    FROM captions.deck
+                    WHERE deck_title = \'"""
+                    + deck_name
+                    + """\'
+                    AND deck_user_uid = \'"""
+                    + user_uid
+                    + """\'
+                    """
+                )
+                deck_check = execute(check_deck_query, "get", conn)
+
+                if deck_check.get("code") == 280 and deck_check["result"]:
+                    # Update existing deck
+                    existing_uid_string = deck_check["result"][0]["deck_image_uids"]
+
+                    if existing_uid_string and existing_uid_string != "()":
+                        # Merge with existing UIDs
+                        uid_string = (
+                            existing_uid_string[:-1]
+                            + ', "'
+                            + '", "'.join(uid_list)
+                            + '")'
+                        )
+
+                    update_deck_query = (
+                        """
+                        UPDATE captions.deck
+                        SET deck_image_uids = \'"""
+                        + uid_string
+                        + """\'
+                        WHERE deck_title = \'"""
+                        + deck_name
+                        + """\'
+                        AND deck_user_uid = \'"""
+                        + user_uid
+                        + """\'
+                        """
+                    )
+                    execute(update_deck_query, "post", conn)
+                    response["deck_uid"] = deck_check["result"][0]["deck_uid"]
+                else:
+                    # Create new deck
+                    new_deck_uid = get_new_deckUID(conn)
+                    thumbnail_url = (
+                        uploaded_images[0]["image_url"] if uploaded_images else ""
+                    )
+
+                    create_deck_query = (
+                        """
+                        INSERT INTO captions.deck
+                        SET deck_uid = \'"""
+                        + new_deck_uid
+                        + """\',
+                            deck_title = \'"""
+                        + deck_name
+                        + """\',
+                            deck_user_uid = \'"""
+                        + user_uid
+                        + """\',
+                            deck_image_uids = \'"""
+                        + uid_string
+                        + """\',
+                            deck_thumbnail_url = \'"""
+                        + thumbnail_url
+                        + """\',
+                            deck_description = 'Google Photos images'
+                        """
+                    )
+                    execute(create_deck_query, "post", conn)
+                    response["deck_uid"] = new_deck_uid
+
+            response["message"] = (
+                f"{len(uploaded_images)} Google Photos uploaded successfully"
+            )
+            response["images"] = uploaded_images
+            response["total_uploaded"] = len(uploaded_images)
+            response["game_uid"] = game_uid
+            response["user_uid"] = user_uid
+
+            return response, 200
+
+        except Exception as e:
+            print(f"Error uploading Google Photos: {str(e)}")
+            import traceback
+
+            traceback.print_exc()
+            return {"message": f"Upload failed: {str(e)}"}, 500
+        finally:
+            disconnect(conn)
+
+
 class assignDeck(Resource):
     def post(self):
         response = {}
@@ -2955,197 +3410,6 @@ class uploadImage(Resource):
             disconnect(conn)
 
 
-class uploadDriveImages(Resource):
-    def post(self):
-        response = {}
-        try:
-            conn = connect()
-            data = request.get_json(force=True)
-
-            drive_files = data.get("drive_files", [])
-            user_uid = data.get("user_uid", "PUBLIC")
-            deck_title = data.get(
-                "deck_title", f"Google Drive - {datetime.now().strftime('%Y-%m-%d')}"
-            )
-            access_token = data.get("access_token")  # OAuth token from frontend
-
-            if not drive_files:
-
-                return {"message": "No Drive files provided"}, 400
-
-            if not access_token:
-                return {"message": "Access token required for Drive download"}, 400
-
-            image_uids = []
-            stored_images = []
-            bucket = "iocaptions"
-
-            # Process each Drive file - download and upload to S3
-            for drive_file in drive_files:
-                try:
-                    file_id = drive_file.get("id")
-                    file_name = drive_file.get("name", f"drive_image_{file_id}")
-
-                    # Download image from Google Drive using OAuth token
-                    drive_download_url = (
-                        f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
-                    )
-                    headers = {"Authorization": f"Bearer {access_token}"}
-
-                    download_response = requests.get(
-                        drive_download_url, headers=headers, timeout=30
-                    )
-
-                    if download_response.status_code != 200:
-                        continue
-
-                    # Get file extension
-                    file_ext = (
-                        file_name.rsplit(".", 1)[-1].lower()
-                        if "." in file_name
-                        else "jpg"
-                    )
-
-                    # Generate unique S3 key
-                    timestamp = int(time.time() * 1000)
-                    s3_key = f"drive_images/{user_uid}_{timestamp}_{uuid.uuid4().hex[:8]}.{file_ext}"
-
-                    # Upload to S3
-                    s3.put_object(
-                        Bucket=bucket,
-                        Body=download_response.content,
-                        Key=s3_key,
-                        ACL="public-read",
-                        ContentType=f"image/{file_ext}",
-                    )
-
-                    # Generate S3 URLs
-                    s3_url = f"https://{bucket}.s3.us-west-1.amazonaws.com/{s3_key}"
-
-                    # Generate new image UID
-                    new_image_uid = get_new_imageUID(conn)
-
-                    # Add image to database with S3 URL
-                    add_image_query = (
-                        """
-                        INSERT INTO captions.image
-                        SET image_uid = \'"""
-                        + new_image_uid
-                        + """\',
-                            image_title = \'"""
-                        + file_name.replace("'", "''")
-                        + """\',
-                            image_url = \'"""
-                        + s3_url
-                        + """\',
-                            image_cost = '0',
-                            image_description = 'Uploaded from Google Drive: """
-                        + file_name.replace("'", "''")
-                        + """\'
-                        """
-                    )
-                    image_db_response = execute(add_image_query, "post", conn)
-
-                    if image_db_response.get("code") == 281:
-                        image_uids.append(new_image_uid)
-                        stored_images.append(
-                            {
-                                "image_uid": new_image_uid,
-                                "image_url": s3_url,
-                                "thumbnail_url": s3_url,
-                                "filename": file_name,
-                            }
-                        )
-
-                except Exception as e:
-                    continue
-
-            # Create or update deck
-            deck_uid = None
-            if image_uids:
-                # Check if deck exists
-                check_deck_query = (
-                    """
-                    SELECT deck_uid, deck_image_uids FROM captions.deck
-                    WHERE deck_title = \'"""
-                    + deck_title.replace("'", "''")
-                    + """\' AND deck_user_uid = \'"""
-                    + user_uid
-                    + """\'
-                    """
-                )
-                existing_deck = execute(check_deck_query, "get", conn)
-
-                if existing_deck["code"] == 280 and existing_deck["result"]:
-                    # Deck exists - update it
-                    deck_uid = existing_deck["result"][0]["deck_uid"]
-                    existing_uids = existing_deck["result"][0]["deck_image_uids"]
-
-                    # Merge existing and new UIDs
-                    if existing_uids and existing_uids != "()":
-                        uid_string = (
-                            existing_uids[:-1] + ', "' + '", "'.join(image_uids) + '")'
-                        )
-                    else:
-                        uid_string = '("' + '", "'.join(image_uids) + '")'
-
-                    update_query = (
-                        """
-                        UPDATE captions.deck
-                        SET deck_image_uids = \'"""
-                        + uid_string
-                        + """\'
-                        WHERE deck_uid = \'"""
-                        + deck_uid
-                        + """\'
-                        """
-                    )
-                    execute(update_query, "post", conn)
-
-                else:
-                    # Create new deck
-                    deck_uid = get_new_deckUID(conn)
-                    uid_string = '("' + '", "'.join(image_uids) + '")'
-
-                    create_deck_query = (
-                        """
-                        INSERT INTO captions.deck
-                        SET deck_uid = \'"""
-                        + deck_uid
-                        + """\',
-                            deck_title = \'"""
-                        + deck_title.replace("'", "''")
-                        + """\',
-                            deck_user_uid = \'"""
-                        + user_uid
-                        + """\',
-                            deck_image_uids = \'"""
-                        + uid_string
-                        + """\',
-                            deck_thumbnail_url = \'"""
-                        + stored_images[0].get(
-                            "thumbnail_url", stored_images[0]["image_url"]
-                        )
-                        + """\',
-                            deck_description = 'Images uploaded from Google Drive'
-                        """
-                    )
-                    execute(create_deck_query, "post", conn)
-
-            response["message"] = (
-                f"{len(stored_images)} images successfully downloaded from Drive and uploaded to S3"
-            )
-            response["images"] = stored_images
-            response["deck_uid"] = deck_uid
-            response["total_stored"] = len(stored_images)
-            return response, 200
-
-        except Exception as e:
-            return {"message": f"Failed to process Drive images: {str(e)}"}, 500
-        finally:
-            disconnect(conn)
-
-
 class CheckEmailValidationCode(Resource):
     def post(self):
         response = {}
@@ -4790,6 +5054,7 @@ api.add_resource(
     startPlaying, "/api/v2/startPlaying/<string:game_code>,<string:round_number>"
 )
 api.add_resource(uploadDriveImages, "/api/v2/uploadDriveImages")
+api.add_resource(uploadGooglePhotos, "/api/v2/uploadGooglePhotos")
 api.add_resource(
     getImageForPlayers,
     "/api/v2/getImageForPlayers/<string:game_code>,<string:round_number>",
